@@ -1039,7 +1039,7 @@ function toggleTop10(){
 function renderTop10(){
   const freq={};
   allReports.forEach(r=>r.tags.forEach(t=>{freq[t]=(freq[t]||0)+1;}));
-  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1])
 
   const wrap=document.getElementById('top10Wrap');
   const body=document.getElementById('top10Body');
