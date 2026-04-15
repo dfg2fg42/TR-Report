@@ -375,7 +375,7 @@ input[type="date"] { color-scheme:dark; }
       <div class="date-hint" id="upDateHint"></div>
     </div>
     <div class="fg">
-      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">Enter로 추가 </span></label>
+      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">(Enter로 추가, 띄어쓰기 포함 가능)</span></label>
       <div class="tags-wrap" id="tagsWrap">
         <input type="text" class="tinput" id="tinput" placeholder="#보일러  #압력  #긴급  #SOx ...">
       </div>
@@ -546,13 +546,13 @@ function fmtSize(b){
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-// ═══ Tag Synonyms (동의어 매핑 — 필요시 자유롭게 추가/수정) ═══
+// ═══ Tag Synonyms (동의어 매핑) ═══
 const TAG_SYNONYMS = {
   '미분기':'PULV',   'PULVERIZER':'PULV',
   '튜브':'TUBE',
   '진동':'VIBRATION', 'VIB':'VIBRATION',
   '오일':'OIL',
-  'STG':'STG', '스토리지베슬':'STG', '스토리지 베슬':'STG',
+  '스토리지베슬':'STG', '스토리지 베슬':'STG',
   '리크':'LEAK',
   '런백':'RUNBACK',
   '터빈':'TBN', 'TURBINE':'TBN',
@@ -563,7 +563,8 @@ const TAG_SYNONYMS = {
 };
 
 function normalizeTag(raw){
-  const up = raw.trim().replace(/^#+/,'').trim().toUpperCase();
+  if(!raw) return '';
+  const up=String(raw).trim().replace(/^#+/,'').trim().toUpperCase();
   return TAG_SYNONYMS[up] || up;
 }
 
@@ -575,7 +576,6 @@ function addTag(raw){
   const tag='#'+t;
   if(!cTags.includes(tag)){cTags.push(tag);renderChips();}
 }
-
 function removeTag(t){cTags=cTags.filter(x=>x!==t);renderChips();}
 function renderChips(){
   const c=document.getElementById('tagsWrap'),inp=document.getElementById('tinput');
@@ -591,10 +591,7 @@ function renderChips(){
 const tinput=document.getElementById('tinput');
 tinput.addEventListener('keydown',e=>{
   const v=e.target.value;
-if(e.key==='Enter'){                          // ← ||e.key===' ' 삭제
-  e.preventDefault();
-  if(v.trim()){addTag(v);e.target.value='';}
-}
+  if(e.key==='Enter'){e.preventDefault();if(v.trim()){addTag(v);e.target.value='';}}
   else if(e.key==='Backspace'&&!v&&cTags.length){cTags.pop();renderChips();}
 });
 tinput.addEventListener('blur',e=>{if(e.target.value.trim()){addTag(e.target.value);e.target.value='';}});
@@ -809,7 +806,7 @@ function updateStats(){
   const n=allReports.length;
   document.getElementById('totalBadge').textContent=n+'건';
   document.getElementById('stTotal').textContent=n;
-  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags).map(t=>'#'+normalizeTag(t))).size;
+  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>(r.tags||[])).map(t=>'#'+normalizeTag(t)).filter(t=>t!=='#')).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
   renderTop10();
@@ -840,17 +837,17 @@ function applySearch(){
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
   renderActiveFilters(tf,xt);
   let f=allReports;
-if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
-  const normSearch=normalizeTag(searchTag.slice(1)); // # 제거 후 정규화
-  return r.tags.some(g=>{
-    const normG=normalizeTag(g);
-    return normG===normSearch || g.toLowerCase().includes(searchTag);
-  });
-}));
+  if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
+    const normSearch=normalizeTag(searchTag.slice(1));
+    return (r.tags||[]).some(g=>{
+      const normG=normalizeTag(g);
+      return normG===normSearch || g.toLowerCase().includes(searchTag);
+    });
+  }));
   if(xt.length) f=f.filter(r=>xt.every(t=>
     r.filename.toLowerCase().includes(t)||
     (r.memo&&r.memo.toLowerCase().includes(t))||
-    r.tags.some(g=>g.toLowerCase().includes(t))
+    (r.tags||[]).some(g=>g.toLowerCase().includes(t))
   ));
   renderReports(f);
 }
@@ -1069,11 +1066,12 @@ function toggleTop10(){
 }
 
 function renderTop10(){
-allReports.forEach(r=>r.tags.forEach(t=>{
-  const k='#'+normalizeTag(t);
-  freq[k]=(freq[k]||0)+1;
-}));
-
+  const freq={};
+  allReports.forEach(r=>(r.tags||[]).forEach(t=>{
+    const k='#'+normalizeTag(t);
+    if(k==='#') return;
+    freq[k]=(freq[k]||0)+1;
+  }));
   const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
 
   const wrap=document.getElementById('top10Wrap');
