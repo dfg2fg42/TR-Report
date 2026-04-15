@@ -1,1 +1,649 @@
-dfsd
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 트러블슈팅 레포트 관리</title>
+    <style>
+        :root {
+            --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a;
+            --accent:#4f8ef7; --text:#e2e8f0; --text-muted:#8892a4;
+            --border:#2d3348; --success:#34d399; --warning:#fbbf24;
+            --danger:#f87171; --tag-bg:#1e3a5f; --tag-text:#60a5fa;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Noto Sans KR',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+        header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+        header h1{font-size:1.1rem;font-weight:700;}
+        .badge{background:var(--accent);color:white;font-size:.7rem;padding:2px 10px;border-radius:20px;font-weight:600;}
+        .container{max-width:1200px;margin:0 auto;padding:24px;}
+        .browser-warn{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.4);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-size:.85rem;color:var(--danger);display:none;}
+        .select-area{background:var(--surface);border:2px dashed var(--border);border-radius:14px;padding:36px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px;}
+        .select-area:hover{border-color:var(--accent);background:rgba(79,142,247,.06);}
+        .select-area .icon{font-size:2.5rem;margin-bottom:10px;}
+        .select-area p{color:var(--text-muted);font-size:.88rem;margin-top:5px;}
+        .select-area strong{color:var(--text);}
+        .select-btns{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+        .stats-bar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+        .stat-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:.83rem;color:var(--text-muted);}
+        .stat-item span{color:var(--accent);font-weight:700;font-size:1.05rem;margin-right:2px;}
+        .search-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;margin-bottom:12px;display:flex;gap:10px;align-items:center;}
+        .search-bar input{background:transparent;border:none;outline:none;color:var(--text);font-size:.93rem;flex:1;font-family:inherit;}
+        .search-bar input::placeholder{color:var(--text-muted);}
+        .active-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center;}
+        .filter-tag{background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.4);padding:3px 10px;border-radius:20px;font-size:.78rem;cursor:pointer;display:flex;align-items:center;gap:4px;}
+        .filter-tag:hover{background:rgba(79,142,247,.22);}
+        .reports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+        .report-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;}
+        .report-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 20px rgba(79,142,247,.12);}
+        .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+        .report-date{font-size:.76rem;color:var(--accent);font-weight:700;background:rgba(79,142,247,.1);padding:3px 8px;border-radius:6px;}
+        .report-filename{font-size:.8rem;color:var(--text-muted);margin-bottom:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .report-memo{font-size:.83rem;color:var(--text);margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.6;}
+        .report-tags{display:flex;flex-wrap:wrap;gap:5px;}
+        .report-tag{background:var(--tag-bg);color:var(--tag-text);padding:2px 8px;border-radius:12px;font-size:.76rem;}
+        .perm-badge{font-size:.7rem;background:rgba(251,191,36,.1);color:var(--warning);border:1px solid rgba(251,191,36,.3);padding:2px 7px;border-radius:10px;margin-left:6px;}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center;}
+        .modal-overlay.active{display:flex;}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px;width:90%;max-width:560px;max-height:90vh;overflow-y:auto;}
+        .modal h2{font-size:1rem;margin-bottom:18px;}
+        .detail-modal{max-width:780px;}
+        .form-group{margin-bottom:15px;}
+        .form-group label{display:block;font-size:.73rem;color:var(--text-muted);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+        .form-group input,.form-group textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:.88rem;font-family:inherit;transition:border-color .2s;outline:none;}
+        .form-group input:focus,.form-group textarea:focus{border-color:var(--accent);}
+        .form-group textarea{min-height:110px;resize:vertical;}
+        .date-hint{font-size:.73rem;margin-top:5px;}
+        .date-hint.ok{color:var(--success);}
+        .date-hint.none{color:var(--text-muted);}
+        .filename-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:.8rem;color:var(--text-muted);word-break:break-all;}
+        .tags-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;cursor:text;min-height:42px;transition:border-color .2s;}
+        .tags-wrap:focus-within{border-color:var(--accent);}
+        .tag-chip{background:var(--tag-bg);color:var(--tag-text);padding:3px 10px;border-radius:20px;font-size:.8rem;display:flex;align-items:center;gap:5px;}
+        .tag-chip .rm{cursor:pointer;opacity:.6;font-size:.7rem;}
+        .tag-chip .rm:hover{opacity:1;}
+        .tags-input{border:none;outline:none;background:transparent;color:var(--text);font-size:.86rem;min-width:120px;flex:1;padding:2px 0;}
+        .btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:.86rem;font-weight:600;font-family:inherit;transition:all .15s;}
+        .btn-primary{background:var(--accent);color:white;}
+        .btn-primary:hover{background:#3a7be0;}
+        .btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+        .btn-ghost:hover{background:var(--surface2);color:var(--text);}
+        .btn-success{background:transparent;color:var(--success);border:1px solid rgba(52,211,153,.4);}
+        .btn-success:hover{background:rgba(52,211,153,.08);}
+        .btn-danger{background:transparent;color:var(--danger);border:1px solid rgba(248,113,113,.4);}
+        .btn-danger:hover{background:rgba(248,113,113,.08);}
+        .btn-warn{background:transparent;color:var(--warning);border:1px solid rgba(251,191,36,.4);}
+        .btn-warn:hover{background:rgba(251,191,36,.08);}
+        .btn-sm{padding:6px 13px;font-size:.78rem;}
+        .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;}
+        .detail-section{background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px;}
+        .detail-section h3{font-size:.72rem;color:var(--text-muted);margin-bottom:9px;text-transform:uppercase;letter-spacing:.05em;}
+        .preview-area{width:100%;min-height:80px;}
+        .file-frame{width:100%;height:440px;border:none;border-radius:8px;background:white;}
+        .no-preview{text-align:center;padding:28px;color:var(--text-muted);}
+        .queue-bar{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:.82rem;color:var(--accent);display:none;}
+        .empty-state{text-align:center;padding:60px 20px;color:var(--text-muted);}
+        .empty-state .icon{font-size:3rem;margin-bottom:12px;}
+        .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 18px;font-size:.86rem;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;}
+        .toast.show{transform:translateY(0);opacity:1;}
+        .toast.success{border-color:var(--success);color:var(--success);}
+        .toast.error{border-color:var(--danger);color:var(--danger);}
+        .toast.warn{border-color:var(--warning);color:var(--warning);}
+        input[type="date"]{color-scheme:dark;}
+        ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+        @media(max-width:600px){.container{padding:12px;}.reports-grid{grid-template-columns:1fr;}.modal{padding:16px;}}
+    </style>
+</head>
+<body>
+
+<header>
+    <span style="font-size:1.4rem">🔧</span>
+    <h1>트러블슈팅 레포트 관리</h1>
+    <span class="badge" id="totalBadge">0건</span>
+</header>
+
+<div class="container">
+
+    <div class="browser-warn" id="browserWarn">
+        ⚠️ 현재 브라우저는 파일 경로 직접 접근을 지원하지 않습니다. <strong>Chrome 또는 Edge</strong>를 사용해 주세요.
+    </div>
+
+    <div class="select-area" id="selectArea">
+        <div class="icon">📂</div>
+        <p><strong>파일 경로를 직접 지정하여 등록</strong></p>
+        <p>파일을 복사하지 않고 원본 경로를 그대로 참조합니다</p>
+        <div class="select-btns">
+            <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택</button>
+            <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
+        </div>
+    </div>
+
+    <div class="queue-bar" id="queueBar"></div>
+
+    <div class="stats-bar" id="statsBar" style="display:none">
+        <div class="stat-item">총 레포트 <span id="statTotal">0</span>건</div>
+        <div class="stat-item">해시태그 <span id="statTags">0</span>개</div>
+        <div class="stat-item">최근 발생 <span id="statLatest">-</span></div>
+    </div>
+
+    <div class="search-bar">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="#해시태그 또는 키워드로 검색  (예: #보일러  #긴급  압력이상)" />
+        <button class="btn btn-ghost btn-sm" onclick="clearSearch()">초기화</button>
+    </div>
+    <div class="active-filters" id="activeFilters"></div>
+
+    <div class="reports-grid" id="reportsGrid"></div>
+    <div class="empty-state" id="emptyState">
+        <div class="icon">📋</div>
+        <p>등록된 레포트가 없습니다</p>
+        <p style="margin-top:6px;font-size:.83rem">위 버튼으로 파일을 선택하여 트러블슈팅 이력을 관리하세요</p>
+    </div>
+</div>
+
+<!-- Upload/Edit Modal -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+        <h2 id="modalTitle">📋 레포트 정보 입력</h2>
+        <div class="form-group">
+            <label>파일명 / 경로</label>
+            <div class="filename-box" id="modalFilename"></div>
+        </div>
+        <div class="form-group">
+            <label>발생 일자</label>
+            <input type="date" id="modalDate" />
+            <div class="date-hint" id="dateHint"></div>
+        </div>
+        <div class="form-group">
+            <label>해시태그 <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.76rem">(입력 후 Space 또는 Enter)</span></label>
+            <div class="tags-wrap" id="tagsWrap">
+                <input type="text" class="tags-input" id="tagInput" placeholder="#보일러  #압력  #긴급  #튜브리크 ..." />
+            </div>
+        </div>
+        <div class="form-group">
+            <label>트러블 내용 및 조치 사항</label>
+            <textarea id="modalMemo" placeholder="발생 원인, 증상, 조치 내용 메모...&#10;&#10;나중에 이 내용도 키워드로 검색됩니다."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">취소</button>
+            <button class="btn btn-ghost" id="skipBtn" style="display:none" onclick="skipQueue()">다음 파일 →</button>
+            <button class="btn btn-primary" id="saveBtn">💾 저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal detail-modal">
+        <div id="detailContent"></div>
+        <div class="modal-actions" id="detailActions"></div>
+    </div>
+</div>
+
+<!-- Folder Scan Modal -->
+<div class="modal-overlay" id="folderModal">
+    <div class="modal" style="max-width:680px">
+        <h2>📁 폴더 스캔 결과</h2>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:14px">등록할 파일을 선택하세요</p>
+        <div id="folderFileList" style="max-height:400px;overflow-y:auto;margin-bottom:16px"></div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeFolderModal()">닫기</button>
+            <button class="btn btn-primary" onclick="registerSelected()">✅ 선택 파일 등록</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== IndexedDB ==========
+let db;
+const DB_NAME='TroubleshootDB', DB_VER=2, STORE='reports';
+
+function initDB(){
+    return new Promise((res,rej)=>{
+        const r=indexedDB.open(DB_NAME,DB_VER);
+        r.onerror=()=>rej(r.error);
+        r.onsuccess=()=>{db=r.result;res();};
+        r.onupgradeneeded=e=>{
+            const d=e.target.result;
+            if(!d.objectStoreNames.contains(STORE))
+                d.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});
+        };
+    });
+}
+const dbOp=(mode,fn)=>new Promise((res,rej)=>{
+    const tx=db.transaction(STORE,mode), st=tx.objectStore(STORE), r=fn(st);
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+});
+const dbAdd =d => dbOp('readwrite',s=>s.add(d));
+const dbPut =d => dbOp('readwrite',s=>s.put(d));
+const dbDel =id=> dbOp('readwrite',s=>s.delete(id));
+const dbGet =id=> dbOp('readonly', s=>s.get(id));
+const dbAll =()=> dbOp('readonly', s=>s.getAll());
+
+// ========== FSA Check ==========
+const FSA = 'showOpenFilePicker' in window;
+if(!FSA) document.getElementById('browserWarn').style.display='block';
+
+// ========== Date Extraction ==========
+function extractDate(name){
+    // 1) YYYY-MM-DD / YYYY_MM_DD / YYYY.MM.DD (8자리 구분자 포함)
+    let m=name.match(/(\d{4})[-_.](\d{2})[-_.](\d{2})/);
+    if(m){
+        const [,y,mo,d]=m;
+        if(+y>=2000&&+y<=2099&&+mo>=1&&+mo<=12&&+d>=1&&+d<=31) return `${y}-${mo}-${d}`;
+    }
+    // 2) YY-MM-DD / YY_MM_DD / YY.MM.DD (6자리 구분자 포함, 예: 26-04-01)
+    m=name.match(/(?:^|[^0-9])(\d{2})[-_.](\d{2})[-_.](\d{2})(?:[^0-9]|$)/);
+    if(m){
+        const [,y,mo,d]=m;
+        if(+mo>=1&&+mo<=12&&+d>=1&&+d<=31) return `20${y}-${mo}-${d}`;
+    }
+    // 3) YYYYMMDD (8자리 연속, 예: 20260401)
+    m=name.match(/(?:^|[^0-9])(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:[^0-9]|$)/);
+    if(m){
+        const [,y,mo,d]=m;
+        if(+y>=2000&&+y<=2099) return `${y}-${mo}-${d}`;
+    }
+    // 4) YYMMDD (6자리 연속, 예: 260401)
+    m=name.match(/(?:^|[^0-9])(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:[^0-9]|$)/);
+    if(m){
+        const [,y,mo,d]=m;
+        return `20${y}-${mo}-${d}`;
+    }
+    // 5) Fallback YYYYMMDD
+    m=name.match(/(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+    if(m){
+        const [,y,mo,d]=m;
+        if(+y>=2000&&+y<=2099) return `${y}-${mo}-${d}`;
+    }
+    return '';
+}
+
+function fmtDate(s){
+    if(!s) return '날짜 미지정';
+    const [y,m,d]=s.split('-');
+    return `${y}년 ${+m}월 ${+d}일`;
+}
+
+function fileIcon(name){
+    const e=name.split('.').pop().toLowerCase();
+    return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',
+            jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',bmp:'🖼️',
+            txt:'📃',zip:'📦',rar:'📦',hwp:'📝',hwpx:'📝',csv:'📊'}[e]||'📁';
+}
+function fmtSize(b){
+    if(b<1024) return b+' B';
+    if(b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ========== Tags ==========
+let currentTags=[];
+function addTag(raw){
+    let t=raw.trim().replace(/^#+/,'').trim();
+    if(!t) return;
+    t='#'+t;
+    if(!currentTags.includes(t)){currentTags.push(t);renderChips();}
+}
+function removeTag(t){currentTags=currentTags.filter(x=>x!==t);renderChips();}
+function renderChips(){
+    const c=document.getElementById('tagsWrap'), inp=document.getElementById('tagInput');
+    c.innerHTML='';
+    currentTags.forEach(t=>{
+        const div=document.createElement('div'); div.className='tag-chip';
+        div.innerHTML=`${t} <span class="rm" onclick="removeTag('${CSS.escape(t).replace(/'/g,"\'")}')">✕</span>`;
+        c.appendChild(div);
+    });
+    c.appendChild(inp); inp.focus();
+}
+const tagInp=document.getElementById('tagInput');
+tagInp.addEventListener('keydown',e=>{
+    const v=e.target.value;
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();if(v.trim()){addTag(v);e.target.value='';}}
+    else if(e.key==='Backspace'&&!v&&currentTags.length){currentTags.pop();renderChips();}
+});
+tagInp.addEventListener('blur',e=>{if(e.target.value.trim()){addTag(e.target.value);e.target.value='';}});
+document.getElementById('tagsWrap').addEventListener('click',()=>tagInp.focus());
+
+// ========== File Queue ==========
+let fileQueue=[], queueIndex=0, editingId=null;
+let folderHandles=[];
+
+async function selectFiles(){
+    if(!FSA){showToast('Chrome/Edge 브라우저를 사용해 주세요','error');return;}
+    try{
+        const handles=await window.showOpenFilePicker({multiple:true});
+        startQueue(handles);
+    }catch(e){if(e.name!=='AbortError') showToast('파일 선택 오류: '+e.message,'error');}
+}
+
+async function selectFolder(){
+    if(!FSA){showToast('Chrome/Edge 브라우저를 사용해 주세요','error');return;}
+    try{
+        const dir=await window.showDirectoryPicker();
+        const handles=[];
+        for await(const [name,h] of dir.entries()){
+            if(h.kind==='file') handles.push(h);
+        }
+        if(!handles.length){showToast('폴더에 파일이 없습니다','warn');return;}
+        showFolderModal(handles);
+    }catch(e){if(e.name!=='AbortError') showToast('폴더 선택 오류: '+e.message,'error');}
+}
+
+function startQueue(handles){
+    fileQueue=[...handles]; queueIndex=0;
+    openNextInQueue();
+}
+
+async function openNextInQueue(){
+    if(queueIndex>=fileQueue.length){closeModal();return;}
+    const h=fileQueue[queueIndex];
+    const file=await h.getFile();
+    editingId=null;
+    currentTags=[];
+    document.getElementById('modalTitle').textContent='📋 레포트 정보 입력';
+    document.getElementById('saveBtn').textContent='💾 저장';
+    document.getElementById('saveBtn').onclick=saveReport;
+    document.getElementById('modalFilename').textContent=file.name;
+    const d=extractDate(file.name);
+    document.getElementById('modalDate').value=d;
+    const hint=document.getElementById('dateHint');
+    if(d){hint.textContent='✅ 파일명에서 날짜 자동 인식: '+fmtDate(d);hint.className='date-hint ok';}
+    else{hint.textContent='ℹ️ 파일명에서 날짜를 인식하지 못했습니다. 직접 입력해 주세요.';hint.className='date-hint none';}
+    document.getElementById('modalMemo').value='';
+    const skipBtn=document.getElementById('skipBtn');
+    skipBtn.style.display=fileQueue.length>1?'inline-block':'none';
+    skipBtn.textContent=`건너뜀 (${queueIndex+1}/${fileQueue.length})`;
+    renderChips();
+    updateQueueBar();
+    document.getElementById('uploadModal').classList.add('active');
+}
+
+function updateQueueBar(){
+    const bar=document.getElementById('queueBar');
+    if(fileQueue.length>1){
+        bar.style.display='block';
+        bar.textContent=`📂 ${queueIndex+1} / ${fileQueue.length}번째 파일 등록 중`;
+    } else { bar.style.display='none'; }
+}
+
+function skipQueue(){ queueIndex++; openNextInQueue(); }
+
+async function saveReport(){
+    const v=tagInp.value.trim(); if(v){addTag(v);tagInp.value='';}
+    const h=fileQueue[queueIndex];
+    const file=await h.getFile();
+    const date=document.getElementById('modalDate').value;
+    const memo=document.getElementById('modalMemo').value.trim();
+    try{
+        await dbAdd({
+            fileHandle:h, filename:file.name, fileSize:file.size, fileType:file.type,
+            date, tags:[...currentTags], memo, createdAt:new Date().toISOString()
+        });
+        queueIndex++;
+        await loadReports();
+        showToast('✅ 저장되었습니다','success');
+        openNextInQueue();
+    }catch(e){showToast('❌ 저장 실패: '+e.message,'error');}
+}
+
+function closeModal(){
+    document.getElementById('uploadModal').classList.remove('active');
+    document.getElementById('queueBar').style.display='none';
+    fileQueue=[]; queueIndex=0; editingId=null; currentTags=[];
+}
+
+// ========== Edit ==========
+async function openEdit(id){
+    const r=await dbGet(id); editingId=id;
+    currentTags=[...r.tags]; fileQueue=[];
+    document.getElementById('modalTitle').textContent='✏️ 레포트 수정';
+    document.getElementById('saveBtn').textContent='✅ 수정 완료';
+    document.getElementById('saveBtn').onclick=updateReport;
+    document.getElementById('modalFilename').textContent=r.filename;
+    document.getElementById('modalDate').value=r.date||'';
+    document.getElementById('skipBtn').style.display='none';
+    const hint=document.getElementById('dateHint');
+    hint.textContent=''; hint.className='date-hint';
+    document.getElementById('modalMemo').value=r.memo||'';
+    renderChips(); closeDetailModal();
+    document.getElementById('uploadModal').classList.add('active');
+}
+
+async function updateReport(){
+    const v=tagInp.value.trim(); if(v){addTag(v);tagInp.value='';}
+    const r=await dbGet(editingId);
+    r.date=document.getElementById('modalDate').value;
+    r.tags=[...currentTags];
+    r.memo=document.getElementById('modalMemo').value.trim();
+    await dbPut(r); closeModal(); await loadReports(); showToast('✅ 수정되었습니다','success');
+}
+
+// ========== Folder Modal ==========
+async function showFolderModal(handles){
+    folderHandles=handles;
+    const list=document.getElementById('folderFileList');
+    list.innerHTML='';
+    for(const h of handles){
+        const file=await h.getFile();
+        const d=extractDate(h.name);
+        const row=document.createElement('div');
+        row.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin-bottom:6px;background:var(--surface2);';
+        row.innerHTML=`
+            <input type="checkbox" checked data-name="${esc(h.name)}" style="width:16px;height:16px;cursor:pointer">
+            <span style="font-size:1.1rem">${fileIcon(h.name)}</span>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.name)}</div>
+                <div style="font-size:.74rem;color:var(--text-muted);margin-top:2px">${fmtSize(file.size)} ${d?'· '+fmtDate(d):'· 날짜 미인식'}</div>
+            </div>`;
+        list.appendChild(row);
+    }
+    document.getElementById('folderModal').classList.add('active');
+}
+
+function closeFolderModal(){document.getElementById('folderModal').classList.remove('active');}
+
+function registerSelected(){
+    const checks=document.querySelectorAll('#folderFileList input[type=checkbox]');
+    const selected=[];
+    checks.forEach((cb,i)=>{if(cb.checked) selected.push(folderHandles[i]);});
+    if(!selected.length){showToast('선택된 파일이 없습니다','warn');return;}
+    closeFolderModal();
+    startQueue(selected);
+}
+
+// ========== Load & Render ==========
+let allReports=[];
+async function loadReports(){
+    allReports=await dbAll();
+    allReports.sort((a,b)=>{
+        const da=a.date||a.createdAt.slice(0,10), db2=b.date||b.createdAt.slice(0,10);
+        return db2.localeCompare(da);
+    });
+    updateStats(); applySearch();
+}
+
+function updateStats(){
+    const n=allReports.length;
+    document.getElementById('totalBadge').textContent=n+'건';
+    document.getElementById('statTotal').textContent=n;
+    const tags=new Set(allReports.flatMap(r=>r.tags));
+    document.getElementById('statTags').textContent=tags.size;
+    const lat=allReports[0];
+    document.getElementById('statLatest').textContent=lat?fmtDate(lat.date):'-';
+    document.getElementById('statsBar').style.display=n>0?'flex':'none';
+}
+
+function renderReports(list){
+    const grid=document.getElementById('reportsGrid');
+    const empty=document.getElementById('emptyState');
+    if(!list.length){grid.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    grid.innerHTML=list.map(r=>`
+        <div class="report-card" onclick="openDetail(${r.id})">
+            <div class="card-header">
+                <span class="report-date">${fmtDate(r.date)}</span>
+                <span style="font-size:1.2rem">${fileIcon(r.filename)}</span>
+            </div>
+            <div class="report-filename" title="${esc(r.filename)}">${esc(r.filename)}</div>
+            <div class="report-memo">${r.memo?esc(r.memo):'<span style="color:var(--text-muted);font-style:italic">메모 없음</span>'}</div>
+            <div class="report-tags">${r.tags.map(t=>`<span class="report-tag">${t}</span>`).join('')}</div>
+        </div>
+    `).join('');
+}
+
+// ========== Search ==========
+let debounce;
+document.getElementById('searchInput').addEventListener('input',()=>{clearTimeout(debounce);debounce=setTimeout(applySearch,180);});
+
+function applySearch(){
+    const raw=document.getElementById('searchInput').value.trim().toLowerCase();
+    const tokens=raw.split(/\s+/).filter(Boolean);
+    const tagF=tokens.filter(t=>t.startsWith('#')), textF=tokens.filter(t=>!t.startsWith('#'));
+    renderActiveFilters(tagF,textF);
+    let f=allReports;
+    if(tagF.length) f=f.filter(r=>tagF.every(tf=>r.tags.some(t=>t.toLowerCase().includes(tf))));
+    if(textF.length) f=f.filter(r=>textF.every(tf=>
+        r.filename.toLowerCase().includes(tf)||
+        (r.memo&&r.memo.toLowerCase().includes(tf))||
+        r.tags.some(t=>t.toLowerCase().includes(tf))
+    ));
+    renderReports(f);
+}
+
+function renderActiveFilters(tags,texts){
+    const c=document.getElementById('activeFilters'); const all=[...tags,...texts];
+    if(!all.length){c.innerHTML='';return;}
+    c.innerHTML='<span style="font-size:.76rem;color:var(--text-muted)">검색 필터:</span>'+
+        all.map(f=>`<span class="filter-tag" onclick="removeFilter('${esc(f)}')">${f} ✕</span>`).join('');
+}
+function removeFilter(f){
+    const inp=document.getElementById('searchInput');
+    inp.value=inp.value.split(/\s+/).filter(p=>p.toLowerCase()!==f.toLowerCase()).join(' ');
+    applySearch();
+}
+function clearSearch(){document.getElementById('searchInput').value='';applySearch();}
+
+// ========== Detail Modal ==========
+async function openDetail(id){
+    const r=await dbGet(id); if(!r) return;
+
+    // Check permission status
+    let permStatus='unknown';
+    if(r.fileHandle){
+        try{permStatus=await r.fileHandle.queryPermission({mode:'read'});}
+        catch(e){permStatus='error';}
+    }
+
+    document.getElementById('detailContent').innerHTML=`
+        <h2 style="margin-bottom:4px;word-break:break-all">${fileIcon(r.filename)} ${esc(r.filename)}</h2>
+        <p style="font-size:.76rem;color:var(--text-muted);margin-bottom:18px">
+            등록일: ${new Date(r.createdAt).toLocaleDateString('ko-KR')} &nbsp;|&nbsp;
+            크기: ${fmtSize(r.fileSize)}
+            ${permStatus==='granted'?'&nbsp;|&nbsp;<span style="color:var(--success)">🔓 파일 접근 가능</span>':
+              permStatus==='prompt'? '&nbsp;|&nbsp;<span style="color:var(--warning)">🔒 파일 접근 권한 필요</span>':''}
+        </p>
+        <div class="detail-section">
+            <h3>📅 발생 일자</h3>
+            <p style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmtDate(r.date)}</p>
+        </div>
+        <div class="detail-section">
+            <h3>🏷️ 해시태그</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+                ${r.tags.length
+                    ?r.tags.map(t=>`<span class="report-tag" style="font-size:.86rem;padding:4px 12px;cursor:pointer" onclick="tagSearch('${esc(t)}')">${t}</span>`).join('')
+                    :'<span style="color:var(--text-muted)">태그 없음</span>'}
+            </div>
+        </div>
+        <div class="detail-section">
+            <h3>📝 트러블 내용 및 조치 사항</h3>
+            ${r.memo
+                ?`<p style="line-height:1.75;white-space:pre-wrap;font-size:.88rem">${esc(r.memo)}</p>`
+                :'<p style="color:var(--text-muted);font-style:italic">메모 없음</p>'}
+        </div>
+        <div class="detail-section" id="previewSection">
+            <h3>📎 파일 미리보기</h3>
+            <div class="preview-area" id="previewArea">
+                ${permStatus==='granted'
+                    ?'<p style="font-size:.83rem;color:var(--text-muted)">아래 버튼을 눌러 파일을 열어보세요</p>'
+                    :permStatus==='prompt'
+                    ?`<button class="btn btn-warn" onclick="requestAndPreview(${id})">🔑 파일 접근 권한 요청 후 열기</button>`
+                    :'<p style="color:var(--text-muted);font-size:.83rem">파일 핸들 정보가 없습니다</p>'
+                }
+            </div>
+        </div>
+    `;
+
+    document.getElementById('detailActions').innerHTML=`
+        <button class="btn btn-danger" onclick="deleteReport(${r.id})">🗑️ 삭제</button>
+        <button class="btn btn-ghost" onclick="openEdit(${r.id})">✏️ 수정</button>
+        ${r.fileHandle&&permStatus==='granted'?`<button class="btn btn-success" onclick="openFile(${r.id})">🔍 미리보기</button><button class="btn btn-success" onclick="downloadFile(${r.id})">⬇️ 다운로드</button>`:''}
+        ${r.fileHandle&&permStatus==='prompt'?`<button class="btn btn-warn" onclick="requestAndPreview(${r.id})">🔑 권한 요청</button>`:''}
+        <button class="btn btn-primary" onclick="closeDetailModal()">닫기</button>
+    `;
+    document.getElementById('detailModal').classList.add('active');
+}
+
+async function requestAndPreview(id){
+    const r=await dbGet(id);
+    if(!r.fileHandle){showToast('파일 핸들이 없습니다','error');return;}
+    try{
+        const perm=await r.fileHandle.requestPermission({mode:'read'});
+        if(perm==='granted'){
+            showToast('✅ 파일 접근이 허용되었습니다','success');
+            openDetail(id); // refresh
+        } else { showToast('❌ 파일 접근이 거부되었습니다','error'); }
+    }catch(e){showToast('권한 요청 오류: '+e.message,'error');}
+}
+
+async function openFile(id){
+    const r=await dbGet(id);
+    const file=await r.fileHandle.getFile();
+    const ext=r.filename.split('.').pop().toLowerCase();
+    const url=URL.createObjectURL(file);
+    const prev=document.getElementById('previewArea');
+    if(['jpg','jpeg','png','gif','webp','bmp'].includes(ext)){
+        prev.innerHTML=`<img src="${url}" style="max-width:100%;border-radius:8px;max-height:440px;object-fit:contain">`;
+    } else if(ext==='pdf'||ext==='txt'){
+        prev.innerHTML=`<iframe src="${url}" class="file-frame"></iframe>`;
+    } else {
+        prev.innerHTML=`<div class="no-preview"><p style="font-size:2rem">${fileIcon(r.filename)}</p><p style="margin-top:8px">이 형식은 미리보기 불가</p><p style="font-size:.78rem;margin-top:4px;color:var(--text-muted)">다운로드 버튼으로 파일을 여세요</p></div>`;
+    }
+}
+
+async function downloadFile(id){
+    const r=await dbGet(id);
+    const file=await r.fileHandle.getFile();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(file); a.download=r.filename; a.click();
+}
+
+function closeDetailModal(){document.getElementById('detailModal').classList.remove('active');}
+
+async function deleteReport(id){
+    if(!confirm('이 레포트를 삭제하시겠습니까?\n파일 자체는 삭제되지 않습니다.')) return;
+    await dbDel(id); closeDetailModal(); await loadReports(); showToast('🗑️ 삭제되었습니다','success');
+}
+
+function tagSearch(tag){closeDetailModal();document.getElementById('searchInput').value=tag;applySearch();}
+
+// ========== Utils ==========
+function showToast(msg,type=''){
+    const t=document.getElementById('toast');
+    t.textContent=msg; t.className='toast '+type;
+    setTimeout(()=>t.classList.add('show'),10);
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+document.getElementById('uploadModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDetailModal();});
+document.getElementById('folderModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeFolderModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDetailModal();closeFolderModal();}});
+
+// ========== Init ==========
+initDB().then(loadReports);
+</script>
+</body>
+</html>
