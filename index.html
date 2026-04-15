@@ -231,6 +231,8 @@ input[type="date"] { color-scheme:dark; }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 @media(max-width:600px){.container{padding:12px;}.reports-grid{grid-template-columns:1fr;}.modal{padding:16px;}}
 </style>
+<!-- PDF.js: 브라우저 내 PDF 렌더링 라이브러리 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -744,18 +746,82 @@ async function openDetail(id){
   if(perm==='granted'||perm==='buffer') loadPreview(r);
 }
 
-// ─ 미리보기 로드 ─
+// ─ 확장자 → MIME 타입 ─
+function getMime(name){
+  const e=name.split('.').pop().toLowerCase();
+  return {
+    pdf:'application/pdf',
+    jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',
+    gif:'image/gif',webp:'image/webp',bmp:'image/bmp',
+    txt:'text/plain',csv:'text/csv',log:'text/plain',
+    html:'text/html',htm:'text/html',xml:'text/xml',
+    mp4:'video/mp4',mp3:'audio/mpeg',
+  }[e]||'application/octet-stream';
+}
+
+// ─ 파일 Blob 반환 (항상 정확한 MIME 타입 보장) ─
 async function getFileBlob(r){
-  if(r.fileData) return new Blob([r.fileData],{type:r.fileType||'application/octet-stream'});
+  const mime=getMime(r.filename);
+  if(r.fileData){
+    return new Blob([r.fileData],{type:mime});
+  }
   if(r.fileHandle){
     const perm=await r.fileHandle.queryPermission({mode:'read'});
     if(perm!=='granted'){
       const p2=await r.fileHandle.requestPermission({mode:'read'});
       if(p2!=='granted') throw new Error('권한 거부');
     }
-    return await r.fileHandle.getFile();
+    const f=await r.fileHandle.getFile();
+    // MIME 타입이 잘못된 경우 확장자 기반으로 재지정
+    return (f.type && f.type!=='application/octet-stream')
+      ? f
+      : new Blob([await f.arrayBuffer()],{type:mime});
   }
   throw new Error('파일 없음');
+}
+
+// ─ PDF.js 렌더링 ─
+async function renderPDF(blob, area, rid){
+  if(typeof pdfjsLib==='undefined'){
+    area.innerHTML=`<div class="no-preview">
+      <p style="margin-bottom:10px">PDF.js 로드 실패 (인터넷 연결 확인)</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 새 탭에서 열기</button></div>`;
+    return;
+  }
+  pdfjsLib.GlobalWorkerOptions.workerSrc=
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  area.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:.83rem">⏳ PDF 렌더링 중...</div>`;
+
+  try{
+    const ab=await blob.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+    const total=pdf.numPages;
+    const maxP=Math.min(total,15);
+
+    area.innerHTML=`
+      <div style="background:#3a3a3a;border-radius:8px;overflow-y:auto;max-height:520px;padding:12px;" id="pdfWrap">
+        <p style="color:#aaa;font-size:.74rem;text-align:center;margin-bottom:10px">
+          📄 총 ${total}페이지${total>maxP?' (처음 '+maxP+'페이지 표시)':''}
+        </p>
+      </div>`;
+
+    const wrap=document.getElementById('pdfWrap');
+    for(let i=1;i<=maxP;i++){
+      const page=await pdf.getPage(i);
+      const vp=page.getViewport({scale:1.6});
+      const canvas=document.createElement('canvas');
+      canvas.width=vp.width; canvas.height=vp.height;
+      canvas.style.cssText='width:100%;display:block;margin-bottom:8px;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+      const ctx=canvas.getContext('2d');
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      wrap.appendChild(canvas);
+    }
+  }catch(e){
+    area.innerHTML=`<div class="no-preview">
+      <p style="color:var(--danger);margin-bottom:10px">⚠️ PDF 렌더링 실패: ${e.message}</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 새 탭에서 열기</button></div>`;
+  }
 }
 
 async function loadPreview(r){
@@ -765,22 +831,30 @@ async function loadPreview(r){
   try{
     const blob=await getFileBlob(r);
     const url=URL.createObjectURL(blob);
+
     if(['jpg','jpeg','png','gif','webp','bmp'].includes(ext)){
       area.innerHTML=`<img src="${url}" class="preview-img" alt="${esc(r.filename)}">`;
+
     } else if(ext==='pdf'){
-      area.innerHTML=`<iframe src="${url}" class="preview-frame" title="${esc(r.filename)}"></iframe>`;
-    } else if(ext==='txt'||ext==='csv'||ext==='log'){
+      // PDF.js 캔버스 렌더링 (브라우저 뷰어 불필요)
+      await renderPDF(blob, area, r.id);
+
+    } else if(['txt','csv','log','ini','conf','sh','bat','md'].includes(ext)){
       const text=await blob.text();
-      area.innerHTML=`<pre class="preview-text">${esc(text)}</pre>`;
+      area.innerHTML=`<pre class="preview-text">${esc(text.slice(0,50000))}</pre>`;
+
     } else {
       area.innerHTML=`<div class="no-preview">
         <div class="fi">${fileIcon(r.filename)}</div>
-        <p style="margin-bottom:12px">브라우저에서 직접 미리보기 불가</p>
-        <button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기 (새 탭)</button>
+        <p style="margin-bottom:12px">이 형식은 브라우저에서 미리보기 불가</p>
+        <button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기 (새 탭 / 다운로드)</button>
       </div>`;
     }
   }catch(e){
-    area.innerHTML=`<p style="color:var(--danger);font-size:.82rem">미리보기 실패: ${e.message}</p>`;
+    area.innerHTML=`<div class="no-preview">
+      <p style="color:var(--danger);margin-bottom:10px">⚠️ 미리보기 실패: ${e.message}</p>
+      <button class="btn btn-warn" onclick="reqAndPreview(${r.id})">🔑 권한 재요청</button>
+    </div>`;
   }
 }
 
