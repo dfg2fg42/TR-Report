@@ -549,7 +549,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 // ═══ Tags ═══
 let cTags=[];
 function addTag(raw){
-  let t=raw.trim().replace(/^#+/,'').trim();
+  let t=raw.trim().replace(/^#+/,'').trim().toLowerCase(); // ← toLowerCase() 추가
   if(!t)return; t='#'+t;
   if(!cTags.includes(t)){cTags.push(t);renderChips();}
 }
@@ -783,7 +783,7 @@ function updateStats(){
   const n=allReports.length;
   document.getElementById('totalBadge').textContent=n+'건';
   document.getElementById('stTotal').textContent=n;
-  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags)).size;
+  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags).map(t=>t.toLowerCase())).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
   renderTop10();
@@ -1038,7 +1038,10 @@ function toggleTop10(){
 
 function renderTop10(){
   const freq={};
-  allReports.forEach(r=>r.tags.forEach(t=>{freq[t]=(freq[t]||0)+1;}));
+  allReports.forEach(r=>r.tags.forEach(t=>{
+  const k=t.toLowerCase();
+  freq[k]=(freq[k]||0)+1;
+}));
   const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
 
   const wrap=document.getElementById('top10Wrap');
