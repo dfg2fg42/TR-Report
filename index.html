@@ -375,7 +375,7 @@ input[type="date"] { color-scheme:dark; }
       <div class="date-hint" id="upDateHint"></div>
     </div>
     <div class="fg">
-      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">(Space 또는 Enter로 추가)</span></label>
+      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">Enter로 추가 </span></label>
       <div class="tags-wrap" id="tagsWrap">
         <input type="text" class="tinput" id="tinput" placeholder="#보일러  #압력  #긴급  #SOx ...">
       </div>
@@ -549,7 +549,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 // ═══ Tags ═══
 let cTags=[];
 function addTag(raw){
-  let t=raw.trim().replace(/^#+/,'').trim().toLowerCase(); // ← toLowerCase() 추가
+  let t=raw.trim().replace(/^#+/,'').trim().toUpperCase(); // ← toUpperCase() 추가
   if(!t)return; t='#'+t;
   if(!cTags.includes(t)){cTags.push(t);renderChips();}
 }
@@ -568,7 +568,10 @@ function renderChips(){
 const tinput=document.getElementById('tinput');
 tinput.addEventListener('keydown',e=>{
   const v=e.target.value;
-  if(e.key==='Enter'||e.key===' '){e.preventDefault();if(v.trim()){addTag(v);e.target.value='';}}
+if(e.key==='Enter'){                          // ← ||e.key===' ' 삭제
+  e.preventDefault();
+  if(v.trim()){addTag(v);e.target.value='';}
+}
   else if(e.key==='Backspace'&&!v&&cTags.length){cTags.pop();renderChips();}
 });
 tinput.addEventListener('blur',e=>{if(e.target.value.trim()){addTag(e.target.value);e.target.value='';}});
