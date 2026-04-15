@@ -548,11 +548,11 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 // ═══ Tag Synonyms (동의어 매핑) ═══
 const TAG_SYNONYMS = {
-  '미분기':'PULV',   'PULVERIZER':'PULV',
+  '미분기':'PULV',   'PULVERIZER':'PULV', '클래시파이어':'Classifier',
   '튜브':'TUBE',
   '진동':'VIBRATION', 'VIB':'VIBRATION',
-  '오일':'OIL',
-  '스토리지베슬':'STG', '스토리지 베슬':'STG',
+  '오일':'OIL', '버너':'BNR',
+  '스토리지베슬':'STG', '스토리지 베슬':'STG', '베슬':'VESSEL',
   '리크':'LEAK',
   '런백':'RUNBACK',
   '터빈':'TBN', 'TURBINE':'TBN',
@@ -561,6 +561,13 @@ const TAG_SYNONYMS = {
   '프로텍션':'PROTECTION', 'PROT':'PROTECTION',
   '슬립':'SLIP',
   '메탈':'Metal',
+  '급전':'KPX',
+  '스캐너':'Scanner'
+  '발전기':'Gen'
+  '댐퍼':'Damper'
+  '베어링':'BRG'
+  '연료유':'Light Oil'
+  
 };
 
 function normalizeTag(raw){
