@@ -560,6 +560,7 @@ const TAG_SYNONYMS = {
   '히터':'HEATER',
   '프로텍션':'PROTECTION', 'PROT':'PROTECTION',
   '슬립':'SLIP',
+  '메탈':'Metal',
 };
 
 function normalizeTag(raw){
@@ -844,11 +845,16 @@ function applySearch(){
       return normG===normSearch || g.toLowerCase().includes(searchTag);
     });
   }));
-  if(xt.length) f=f.filter(r=>xt.every(t=>
-    r.filename.toLowerCase().includes(t)||
+if(xt.length) f=f.filter(r=>xt.every(t=>{
+    const normT=normalizeTag(t);  // ← 검색어도 정규화
+    return r.filename.toLowerCase().includes(t)||
     (r.memo&&r.memo.toLowerCase().includes(t))||
-    (r.tags||[]).some(g=>g.toLowerCase().includes(t))
-  ));
+    (r.tags||[]).some(g=>
+      g.toLowerCase().includes(t) || normalizeTag(g)===normT  // ← 동의어 비교 추가
+    );
+  }));
+
+
   renderReports(f);
 }
 function renderActiveFilters(tf,xt){
