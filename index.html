@@ -46,7 +46,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
   transition:max-height .35s cubic-bezier(.4,0,.2,1), padding .3s ease;
   padding:0 20px;
 }
-.upload-panel.open { max-height:160px; padding:16px 20px; }
+.upload-panel.open { max-height:260px; padding:16px 20px; }
 .upload-inner {
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   max-width:1200px; margin:0 auto;
@@ -320,6 +320,10 @@ input[type="date"] { color-scheme:dark; }
     <div class="panel-actions">
       <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택 (경로 직접)</button>
       <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
+      <button class="btn btn-success" onclick="exportData()">💾 백업 (JSON)</button>
+      <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (JSON)</button>
+      <input type="file" id="importInput" style="display:none" accept=".json"
+             onchange="importData(this.files[0]);this.value=''">
       <button class="btn btn-ghost" onclick="togglePanel()">✕ 닫기</button>
     </div>
   </div>
@@ -548,7 +552,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 
 // ═══ Tag Synonyms (동의어 매핑) ═══
 const TAG_SYNONYMS = {
-  '미분기':'PULV',   'PULVERIZER':'PULV', '클래시파이어':'Classifier',
+  '미분기':'PULV', 'PULVERIZER':'PULV', '클래시파이어':'CLASSIFIER',
   '튜브':'TUBE',
   '진동':'VIBRATION', 'VIB':'VIBRATION',
   '오일':'OIL', '버너':'BNR',
@@ -560,14 +564,13 @@ const TAG_SYNONYMS = {
   '히터':'HEATER',
   '프로텍션':'PROTECTION', 'PROT':'PROTECTION',
   '슬립':'SLIP',
-  '메탈':'Metal',
+  '메탈':'METAL',
   '급전':'KPX',
-  '스캐너':'Scanner'
-  '발전기':'Gen'
-  '댐퍼':'Damper'
-  '베어링':'BRG'
-  '연료유':'Light Oil'
-  
+  '스캐너':'SCANNER',
+  '발전기':'GEN', 'GENERATOR':'GEN',
+  '댐퍼':'DAMPER',
+  '베어링':'BRG', 'BEARING':'BRG',
+  '연료유':'LIGHT OIL',
 };
 
 function normalizeTag(raw){
@@ -852,16 +855,12 @@ function applySearch(){
       return normG===normSearch || g.toLowerCase().includes(searchTag);
     });
   }));
-if(xt.length) f=f.filter(r=>xt.every(t=>{
-    const normT=normalizeTag(t);  // ← 검색어도 정규화
+  if(xt.length) f=f.filter(r=>xt.every(t=>{
+    const normT=normalizeTag(t);
     return r.filename.toLowerCase().includes(t)||
     (r.memo&&r.memo.toLowerCase().includes(t))||
-    (r.tags||[]).some(g=>
-      g.toLowerCase().includes(t) || normalizeTag(g)===normT  // ← 동의어 비교 추가
-    );
+    (r.tags||[]).some(g=>g.toLowerCase().includes(t)||normalizeTag(g)===normT);
   }));
-
-
   renderReports(f);
 }
 function renderActiveFilters(tf,xt){
@@ -1312,6 +1311,61 @@ async function delReport(id){
   await dbDel(id); closeDtModal(); await loadReports(); showToast('🗑️ 삭제됐습니다','ok');
 }
 function tagSearch(t){closeDtModal();document.getElementById('searchInp').value=t;applySearch();}
+
+// ═══ Export / Import (백업 & 복원) ═══
+async function exportData(){
+  const data=await dbAll();
+  const exportable=data.map(r=>{
+    const obj={
+      filename:r.filename, fileSize:r.fileSize||0, fileType:r.fileType||'',
+      date:r.date||'', tags:r.tags||[], memo:r.memo||'', createdAt:r.createdAt||''
+    };
+    if(r.fileData){
+      const bytes=new Uint8Array(r.fileData);
+      let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
+      obj.fileDataB64=btoa(bin);
+    }
+    return obj;
+  });
+  const json=JSON.stringify({version:1,exportedAt:new Date().toISOString(),reports:exportable},null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const d=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href=url; a.download=`troubleshoot_backup_${d}.json`; a.style.display='none';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+  showToast(`✅ ${exportable.length}건 백업 완료`,'ok');
+}
+
+async function importData(file){
+  if(!file) return;
+  try{
+    const text=await file.text();
+    const data=JSON.parse(text);
+    const reports=data.reports||data;
+    if(!Array.isArray(reports)) throw new Error('올바른 백업 파일이 아닙니다');
+    let count=0;
+    for(const r of reports){
+      let fileData=null;
+      if(r.fileDataB64){
+        const bin=atob(r.fileDataB64);
+        const bytes=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+        fileData=bytes.buffer;
+      }
+      await dbAdd({
+        fileHandle:null, fileData,
+        filename:r.filename||'알수없음', fileSize:r.fileSize||0, fileType:r.fileType||'',
+        date:r.date||'', tags:r.tags||[], memo:r.memo||'',
+        createdAt:r.createdAt||new Date().toISOString()
+      });
+      count++;
+    }
+    await loadReports();
+    showToast(`✅ ${count}건 복원 완료`,'ok');
+  }catch(e){showToast('❌ 복원 실패: '+e.message,'err');}
+}
 
 // ═══ Toast ═══
 function showToast(msg,type=''){
