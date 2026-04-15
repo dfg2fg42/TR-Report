@@ -272,6 +272,23 @@ input[type="date"] { color-scheme:dark; }
 .top10-bar{height:3px;background:var(--border);border-radius:2px;
            margin-top:5px;overflow:hidden;}
 .top10-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
+
+/* ── 파일 찾기 가이드 ── */
+.guide-modal{max-width:420px;}
+.guide-fname{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+             padding:12px 14px;font-size:.9rem;font-weight:600;word-break:break-all;
+             display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0;}
+.guide-fname span{flex:1;}
+.guide-steps{list-style:none;counter-reset:step;}
+.guide-steps li{counter-increment:step;display:flex;align-items:flex-start;gap:10px;
+                padding:9px 0;border-bottom:1px solid var(--border);font-size:.84rem;line-height:1.5;}
+.guide-steps li:last-child{border-bottom:none;}
+.guide-steps li::before{content:counter(step);min-width:22px;height:22px;
+                         background:var(--accent);color:#fff;border-radius:50%;
+                         display:flex;align-items:center;justify-content:center;
+                         font-size:.72rem;font-weight:700;flex-shrink:0;margin-top:1px;}
+.kbd{background:var(--surface3);border:1px solid var(--border);border-radius:4px;
+     padding:1px 6px;font-size:.78rem;font-family:monospace;color:var(--text);}
 </style>
 <!-- PDF.js: PDF 렌더링 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -396,6 +413,26 @@ input[type="date"] { color-scheme:dark; }
   </div>
 </div>
 
+
+<!-- ═══ 파일 찾기 가이드 모달 ═══ -->
+<div class="overlay" id="guideModal">
+  <div class="modal guide-modal">
+    <h2>📂 파일 위치 찾기</h2>
+    <p style="font-size:.82rem;color:var(--muted)">파일명을 복사하여 Windows 탐색기에서 검색하세요</p>
+    <div class="guide-fname">
+      <span id="guideFname"></span>
+      <button class="btn btn-primary btn-sm" onclick="copyFilename()" id="copyBtn">📋 복사</button>
+    </div>
+    <ul class="guide-steps">
+      <li><span><kbd class="kbd">Win</kbd> + <kbd class="kbd">E</kbd> 로 Windows 탐색기 열기</span></li>
+      <li><span>상단 검색창 클릭 후 <kbd class="kbd">Ctrl</kbd> + <kbd class="kbd">V</kbd> 로 파일명 붙여넣기</span></li>
+      <li><span>검색 결과에서 파일 우클릭 → <strong>파일 위치 열기</strong></span></li>
+    </ul>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeGuideModal()">닫기</button>
+    </div>
+  </div>
+</div>
 <!-- ═══ DUPLICATE MODAL ═══ -->
 <div class="overlay" id="dupModal">
   <div class="modal" style="max-width:460px">
@@ -855,7 +892,10 @@ async function openDetail(id){
     <button class="btn btn-danger" onclick="delReport(${r.id})">🗑️ 삭제</button>
     <button class="btn btn-ghost" onclick="openEdit(${r.id})">✏️ 수정</button>
     ${(perm==='granted'||perm==='buffer')
-      ?`<button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기</button>`:''}
+      ?(isPreviewable(r.filename)
+        ?`<button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 새 탭에서 열기</button>`
+        :`<button class="btn btn-primary" onclick="downloadFileDirect(${r.id})">⬇️ 파일 다운로드</button>`)
+      :''}
     ${perm==='prompt'
       ?`<button class="btn btn-warn" onclick="reqAndPreview(${r.id})">🔑 권한 요청</button>`:''}
     <button class="btn btn-primary" onclick="closeDtModal()">닫기</button>`;
@@ -870,12 +910,29 @@ async function openDetail(id){
 function getMime(name){
   const e=name.split('.').pop().toLowerCase();
   return {
-    pdf:'application/pdf',
+    // 이미지
     jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',
-    gif:'image/gif',webp:'image/webp',bmp:'image/bmp',
+    gif:'image/gif',webp:'image/webp',bmp:'image/bmp',tiff:'image/tiff',
+    // 문서
+    pdf:'application/pdf',
     txt:'text/plain',csv:'text/csv',log:'text/plain',
-    html:'text/html',htm:'text/html',xml:'text/xml',
-    mp4:'video/mp4',mp3:'audio/mpeg',
+    html:'text/html',htm:'text/html',xml:'text/xml',md:'text/markdown',
+    // MS Office
+    xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    xls:'application/vnd.ms-excel',
+    docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc:'application/msword',
+    pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ppt:'application/vnd.ms-powerpoint',
+    // 한글
+    hwp:'application/x-hwp',
+    hwpx:'application/haansofthwpx',
+    // 압축
+    zip:'application/zip',
+    rar:'application/x-rar-compressed',
+    '7z':'application/x-7z-compressed',
+    // 미디어
+    mp4:'video/mp4',mp3:'audio/mpeg',wav:'audio/wav',
   }[e]||'application/octet-stream';
 }
 
@@ -1086,8 +1143,8 @@ async function loadPreview(r){
     } else {
       area.innerHTML=`<div class="no-preview">
         <div class="fi">${fileIcon(r.filename)}</div>
-        <p style="margin-bottom:12px">이 형식은 브라우저에서 미리보기 불가</p>
-        <button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기 (다운로드)</button>
+        <p style="color:var(--muted);font-size:.82rem;margin-bottom:14px">이 형식은 브라우저에서 미리보기를 지원하지 않습니다</p>
+        <button class="btn btn-primary" onclick="downloadFileDirect(${r.id})">⬇️ 파일 다운로드</button>
       </div>`;
     }
   }catch(e){
@@ -1098,16 +1155,98 @@ async function loadPreview(r){
   }
 }
 
-// ─ 파일 열기 (새 탭) ─
+// ─ 미리보기 가능 여부 판단 ─
+function isPreviewable(filename){
+  const e=filename.split('.').pop().toLowerCase();
+  return ['pdf','jpg','jpeg','png','gif','webp','bmp',
+          'xlsx','xls','csv','docx','doc',
+          'txt','log','ini','conf','sh','bat','md'].includes(e);
+}
+
+// ─ 파일 열기 (새 탭 - PDF/이미지 등) ─
 async function openFileInTab(id){
   const r=await dbGet(id);
   try{
     const blob=await getFileBlob(r);
     const url=URL.createObjectURL(blob);
     window.open(url,'_blank');
-    // 탭이 로드된 후 URL 해제 (지연)
     setTimeout(()=>URL.revokeObjectURL(url), 60000);
   }catch(e){showToast('파일 열기 실패: '+e.message,'err');}
+}
+
+
+// ─ 파일 찾기 (클립보드 복사 + 가이드) ─
+let _guideFname='';
+async function copyAndGuide(id){
+  const r=await dbGet(id);
+  _guideFname=r.filename;
+  document.getElementById('guideFname').textContent=r.filename;
+  document.getElementById('copyBtn').textContent='📋 복사';
+  document.getElementById('guideModal').classList.add('on');
+  // 자동 복사 시도
+  try{await navigator.clipboard.writeText(r.filename);
+    document.getElementById('copyBtn').textContent='✅ 복사됨';}
+  catch(e){}
+}
+function copyFilename(){
+  navigator.clipboard.writeText(_guideFname)
+    .then(()=>{document.getElementById('copyBtn').textContent='✅ 복사됨';
+               showToast('📋 파일명이 복사됐습니다','ok');})
+    .catch(()=>showToast('복사 실패 - 직접 선택하여 복사하세요','err'));
+}
+function closeGuideModal(){document.getElementById('guideModal').classList.remove('on');}
+
+// ─ Blob → data URL 변환 ─
+function blobToDataURL(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+// ─ 파일 직접 다운로드 ─
+// [핵심] showSaveFilePicker를 파일 로드 이전에 먼저 호출 (FSA 올바른 패턴)
+// → 사용자 제스처 유효 시점에 저장 대화상자 열기 → 파일명 100% 정확
+async function downloadFileDirect(id){
+  const r=await dbGet(id);
+
+  // ① Chrome/Edge: showSaveFilePicker 먼저 호출 (파일 데이터 로드보다 앞에)
+  if('showSaveFilePicker' in window){
+    let saveHandle=null;
+    try{
+      saveHandle=await window.showSaveFilePicker({suggestedName:r.filename});
+    }catch(e){
+      if(e.name==='AbortError') return;
+      showToast('❌ 저장창 오류: '+e.name+' '+e.message,'err');
+      return;
+    }
+    try{
+      const blob=await getFileBlob(r);
+      const typedBlob=new Blob([await blob.arrayBuffer()],{type:getMime(r.filename)});
+      const w=await saveHandle.createWritable();
+      await w.write(typedBlob);
+      await w.close();
+      showToast('✅ 저장 완료: '+r.filename,'ok');
+    }catch(e){
+      showToast('❌ 쓰기 실패: '+e.message,'err');
+    }
+    return;
+  }
+
+  // ② FSA 미지원 브라우저 fallback: data URL
+  try{
+    const blob=await getFileBlob(r);
+    const typedBlob=new Blob([await blob.arrayBuffer()],{type:getMime(r.filename)});
+    showToast('⏳ 다운로드 준비 중...','');
+    const dataUrl=await blobToDataURL(typedBlob);
+    const a=document.createElement('a');
+    a.href=dataUrl; a.download=r.filename; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>document.body.removeChild(a),500);
+    showToast('⬇️ 다운로드: '+r.filename,'ok');
+  }catch(e){showToast('❌ 다운로드 실패: '+e.message,'err');}
 }
 
 async function reqAndPreview(id){
@@ -1137,12 +1276,13 @@ function showToast(msg,type=''){
 }
 
 // ═══ Close on overlay click / ESC ═══
-['upModal','dtModal','folderModal','dupModal'].forEach(id=>{
+['upModal','dtModal','folderModal','dupModal','guideModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
     if(e.target===this){
       if(id==='upModal') closeUpModal();
       else if(id==='dtModal') closeDtModal();
       else if(id==='dupModal') closeDupModal();
+      else if(id==='guideModal') closeGuideModal();
       else closeFolderModal();
     }
   });
