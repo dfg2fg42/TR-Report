@@ -546,13 +546,36 @@ function fmtSize(b){
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+// ═══ Tag Synonyms (동의어 매핑 — 필요시 자유롭게 추가/수정) ═══
+const TAG_SYNONYMS = {
+  '미분기':'PULV',   'PULVERIZER':'PULV',
+  '튜브':'TUBE',
+  '진동':'VIBRATION', 'VIB':'VIBRATION',
+  '오일':'OIL',
+  'STG':'STG', '스토리지베슬':'STG', '스토리지 베슬':'STG',
+  '리크':'LEAK',
+  '런백':'RUNBACK',
+  '터빈':'TBN', 'TURBINE':'TBN',
+  '보일러':'BLR', 'BOILER':'BLR',
+  '히터':'HEATER',
+  '프로텍션':'PROTECTION', 'PROT':'PROTECTION',
+  '슬립':'SLIP',
+};
+
+function normalizeTag(raw){
+  const up = raw.trim().replace(/^#+/,'').trim().toUpperCase();
+  return TAG_SYNONYMS[up] || up;
+}
+
 // ═══ Tags ═══
 let cTags=[];
 function addTag(raw){
-  let t=raw.trim().replace(/^#+/,'').trim().toUpperCase(); // ← toUpperCase() 추가
-  if(!t)return; t='#'+t;
-  if(!cTags.includes(t)){cTags.push(t);renderChips();}
+  const t=normalizeTag(raw);
+  if(!t)return;
+  const tag='#'+t;
+  if(!cTags.includes(tag)){cTags.push(tag);renderChips();}
 }
+
 function removeTag(t){cTags=cTags.filter(x=>x!==t);renderChips();}
 function renderChips(){
   const c=document.getElementById('tagsWrap'),inp=document.getElementById('tinput');
@@ -786,7 +809,7 @@ function updateStats(){
   const n=allReports.length;
   document.getElementById('totalBadge').textContent=n+'건';
   document.getElementById('stTotal').textContent=n;
-  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags).map(t=>t.toLowerCase())).size;
+  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags).map(t=>'#'+normalizeTag(t))).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
   renderTop10();
@@ -817,7 +840,13 @@ function applySearch(){
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
   renderActiveFilters(tf,xt);
   let f=allReports;
-  if(tf.length) f=f.filter(r=>tf.every(t=>r.tags.some(g=>g.toLowerCase().includes(t))));
+if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
+  const normSearch=normalizeTag(searchTag.slice(1)); // # 제거 후 정규화
+  return r.tags.some(g=>{
+    const normG=normalizeTag(g);
+    return normG===normSearch || g.toLowerCase().includes(searchTag);
+  });
+}));
   if(xt.length) f=f.filter(r=>xt.every(t=>
     r.filename.toLowerCase().includes(t)||
     (r.memo&&r.memo.toLowerCase().includes(t))||
@@ -1040,11 +1069,11 @@ function toggleTop10(){
 }
 
 function renderTop10(){
-  const freq={};
-  allReports.forEach(r=>r.tags.forEach(t=>{
-  const k=t.toLowerCase();
+allReports.forEach(r=>r.tags.forEach(t=>{
+  const k='#'+normalizeTag(t);
   freq[k]=(freq[k]||0)+1;
 }));
+
   const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
 
   const wrap=document.getElementById('top10Wrap');
