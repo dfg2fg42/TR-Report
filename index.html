@@ -230,9 +230,55 @@ input[type="date"] { color-scheme:dark; }
 ::-webkit-scrollbar-track { background:var(--bg); }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 @media(max-width:600px){.container{padding:12px;}.reports-grid{grid-template-columns:1fr;}.modal{padding:16px;}}
+
+/* ── XLSX 테이블 ── */
+.xlsx-wrap{overflow:auto;max-height:500px;border-radius:8px;background:#1e2130;padding:4px;}
+.xlsx-tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+.xlsx-tab{padding:5px 12px;border-radius:6px;font-size:.76rem;cursor:pointer;
+          background:var(--surface2);color:var(--muted);border:1px solid var(--border);}
+.xlsx-tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.xlsx-tbl{border-collapse:collapse;font-size:.78rem;min-width:100%;}
+.xlsx-tbl td,.xlsx-tbl th{border:1px solid var(--border);padding:5px 10px;
+                           white-space:nowrap;color:var(--text);}
+.xlsx-tbl tr:first-child td,.xlsx-tbl th{background:var(--surface3);
+                                          font-weight:600;color:var(--accent);}
+.xlsx-tbl tr:hover td{background:rgba(79,142,247,.06);}
+/* ── DOCX 뷰어 ── */
+.docx-wrap{background:white;border-radius:8px;padding:16px 24px;
+           max-height:520px;overflow-y:auto;color:#111;}
+.docx-wrap .docx{font-size:13px;}
+
+/* ── 해시태그 Top 10 ── */
+.top10-wrap{background:var(--surface);border:1px solid var(--border);
+            border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;}
+.top10-header{display:flex;align-items:center;justify-content:space-between;
+              margin-bottom:12px;cursor:pointer;user-select:none;}
+.top10-header h3{font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:6px;}
+.top10-toggle{font-size:.75rem;color:var(--muted);transition:transform .2s;}
+.top10-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;}
+.top10-item{display:flex;align-items:center;gap:8px;background:var(--surface2);
+            border:1px solid var(--border);border-radius:8px;padding:7px 10px;
+            cursor:pointer;transition:all .15s;}
+.top10-item:hover{border-color:var(--accent);background:var(--accent2);}
+.top10-rank{font-size:.72rem;font-weight:700;min-width:18px;text-align:center;
+            color:var(--muted);}
+.top10-rank.gold{color:#FFD700;}
+.top10-rank.silver{color:#C0C0C0;}
+.top10-rank.bronze{color:#CD7F32;}
+.top10-tag{flex:1;font-size:.8rem;color:var(--tag-text);font-weight:600;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.top10-cnt{font-size:.72rem;font-weight:700;background:rgba(79,142,247,.15);
+           color:var(--accent);padding:2px 7px;border-radius:10px;white-space:nowrap;}
+.top10-bar{height:3px;background:var(--border);border-radius:2px;
+           margin-top:5px;overflow:hidden;}
+.top10-bar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
 </style>
-<!-- PDF.js: 브라우저 내 PDF 렌더링 라이브러리 -->
+<!-- PDF.js: PDF 렌더링 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- SheetJS: Excel 렌더링 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- docx-preview: Word 렌더링 -->
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js"></script>
 </head>
 <body>
 
@@ -275,6 +321,15 @@ input[type="date"] { color-scheme:dark; }
     <div class="stat">총 <span id="stTotal">0</span>건</div>
     <div class="stat">해시태그 <span id="stTags">0</span>개</div>
     <div class="stat">최근 <span id="stLatest">-</span></div>
+  </div>
+
+  <!-- 해시태그 Top 10 -->
+  <div class="top10-wrap" id="top10Wrap" style="display:none">
+    <div class="top10-header" onclick="toggleTop10()">
+      <h3>🏷️ 해시태그 Top 10</h3>
+      <span class="top10-toggle" id="top10Arrow">▲</span>
+    </div>
+    <div id="top10Body" class="top10-body"></div>
   </div>
 
   <div class="search-wrap">
@@ -337,6 +392,25 @@ input[type="date"] { color-scheme:dark; }
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeFolderModal()">닫기</button>
       <button class="btn btn-primary" onclick="regSelected()">✅ 선택 파일 등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DUPLICATE MODAL ═══ -->
+<div class="overlay" id="dupModal">
+  <div class="modal" style="max-width:460px">
+    <div style="font-size:2rem;text-align:center;margin-bottom:12px">⚠️</div>
+    <h2 style="text-align:center;margin-bottom:8px">이미 등록된 파일입니다</h2>
+    <p style="text-align:center;font-size:.82rem;color:var(--muted);margin-bottom:16px">같은 이름의 파일이 목록에 존재합니다</p>
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:6px">파일명</div>
+      <div id="dupFilename" style="font-size:.88rem;word-break:break-all;font-weight:600"></div>
+      <div id="dupExisting" style="margin-top:10px;font-size:.8rem;color:var(--muted)"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-ghost" id="dupSkipBtn">⏭ 건너뜀</button>
+      <button class="btn btn-warn" id="dupSkipAllBtn" style="display:none">⏭ 중복 전체 건너뜀</button>
+      <button class="btn btn-primary" id="dupRegBtn">✅ 그래도 등록</button>
     </div>
   </div>
 </div>
@@ -490,22 +564,67 @@ async function selectFolder(){
 function handleFiles(items){
   if(!items.length)return;
   if(panelOpen) togglePanel();
-  fQueue=items; fIdx=0; editId=null;
+  fQueue=items; fIdx=0; editId=null; skipAllDups=false;
   openNextInQueue();
 }
 
 function startQueue(handles){
   fQueue=handles; fIdx=0; editId=null;
+  skipAllDups=false;
   openNextInQueue();
 }
+
+// ─ 중복 검사 ─
+let skipAllDups=false;
+
+function isDuplicate(filename){
+  return allReports.find(r=>r.filename===filename)||null;
+}
+
+function showDupModal(filename, existing, onSkip, onReg){
+  document.getElementById('dupFilename').textContent=filename;
+  const info=document.getElementById('dupExisting');
+  if(existing){
+    info.innerHTML=`기존 등록: <span style="color:var(--accent)">${fmtDate(existing.date)}</span>`+
+      (existing.tags.length?` &nbsp;|&nbsp; ${existing.tags.map(t=>`<span class="report-tag">${esc(t)}</span>`).join(' ')}`:'');
+  }
+  const skipAllBtn=document.getElementById('dupSkipAllBtn');
+  skipAllBtn.style.display=fQueue.length>1?'inline-flex':'none';
+
+  document.getElementById('dupSkipBtn').onclick=()=>{ closeDupModal(); onSkip(false); };
+  document.getElementById('dupSkipAllBtn').onclick=()=>{ closeDupModal(); onSkip(true); };
+  document.getElementById('dupRegBtn').onclick=()=>{ closeDupModal(); onReg(); };
+  document.getElementById('dupModal').classList.add('on');
+}
+function closeDupModal(){ document.getElementById('dupModal').classList.remove('on'); }
 
 async function openNextInQueue(){
   if(fIdx>=fQueue.length){closeUpModal();return;}
   const item=fQueue[fIdx];
   let file, handle=null;
-  if(item._file){file=item._file;} // 드래그 업로드
+  if(item._file){file=item._file;}
   else{handle=item; file=await handle.getFile();}
 
+  // ── 중복 파일 검사 ──
+  if(!skipAllDups){
+    const dup=isDuplicate(file.name);
+    if(dup){
+      showDupModal(file.name, dup,
+        (skipAll)=>{
+          if(skipAll) skipAllDups=true;
+          fIdx++; openNextInQueue();
+        },
+        ()=>proceedModal(item, file)
+      );
+      return;
+    }
+  } else {
+    if(isDuplicate(file.name)){ fIdx++; openNextInQueue(); return; }
+  }
+  proceedModal(item, file);
+}
+
+function proceedModal(item, file){
   editId=null; cTags=[];
   document.getElementById('upTitle').textContent='📋 레포트 정보 입력';
   document.getElementById('upSaveBtn').textContent='💾 저장';
@@ -630,6 +749,7 @@ function updateStats(){
   document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags)).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
+  renderTop10();
 }
 function renderReports(list){
   const grid=document.getElementById('reportsGrid');
@@ -780,6 +900,120 @@ async function getFileBlob(r){
   throw new Error('파일 없음');
 }
 
+// ─ XLSX 렌더링 (SheetJS) ─
+let xlsxWorkbook=null;
+async function renderXLSX(blob, area, rid){
+  if(typeof XLSX==='undefined'){
+    area.innerHTML=`<div class="no-preview"><p>SheetJS 로드 실패 (인터넷 연결 확인)</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 다운로드</button></div>`;
+    return;
+  }
+  try{
+    const ab=await blob.arrayBuffer();
+    const wb=XLSX.read(ab,{type:'array'});
+    xlsxWorkbook=wb;
+    renderXLSXSheet(wb, wb.SheetNames[0], area, rid);
+  }catch(e){
+    area.innerHTML=`<div class="no-preview"><p style="color:var(--danger)">Excel 렌더링 실패: ${e.message}</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 다운로드</button></div>`;
+  }
+}
+
+function renderXLSXSheet(wb, sheetName, area, rid){
+  const ws=wb.Sheets[sheetName];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!rows.length){area.innerHTML='<p style="color:var(--muted);padding:12px">빈 시트입니다</p>';return;}
+
+  // 시트 탭
+  const tabs=wb.SheetNames.map(n=>
+    `<span class="xlsx-tab${n===sheetName?' on':''}" onclick="renderXLSXSheet(xlsxWorkbook,'${n.replace(/'/g,"\'")}',document.getElementById('xlsxArea'),${rid})">${esc(n)}</span>`
+  ).join('');
+
+  // 테이블
+  const maxCols=Math.max(...rows.map(r=>r.length));
+  const header=rows[0]||[];
+  let tbl=`<table class="xlsx-tbl"><thead><tr>${header.map(c=>`<th>${esc(String(c))}</th>`).join('')}</tr></thead><tbody>`;
+  for(let i=1;i<Math.min(rows.length,500);i++){
+    tbl+=`<tr>${rows[i].map(c=>`<td>${esc(String(c??''))}</td>`).join('')}</tr>`;
+  }
+  tbl+='</tbody></table>';
+  if(rows.length>501) tbl+=`<p style="color:var(--muted);font-size:.75rem;padding:8px;text-align:center">500행까지 표시 (전체 ${rows.length-1}행)</p>`;
+
+  area.innerHTML=`
+    <div>${wb.SheetNames.length>1?`<div class="xlsx-tabs">${tabs}</div>`:''}</div>
+    <div class="xlsx-wrap" id="xlsxArea">${tbl}</div>
+    <p style="color:var(--muted);font-size:.74rem;margin-top:6px">시트: <strong style="color:var(--accent)">${esc(sheetName)}</strong> &nbsp;|&nbsp; ${rows.length-1}행 × ${maxCols}열</p>`;
+}
+
+// ─ DOCX 렌더링 (docx-preview) ─
+async function renderDOCX(blob, area, rid){
+  if(typeof docx==='undefined'){
+    area.innerHTML=`<div class="no-preview"><p>docx-preview 로드 실패 (인터넷 연결 확인)</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 다운로드</button></div>`;
+    return;
+  }
+  try{
+    area.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:.83rem">⏳ Word 문서 렌더링 중...</div>`;
+    const container=document.createElement('div');
+    container.className='docx-wrap';
+    await docx.renderAsync(blob, container, null,{
+      className:'docx', inWrapper:true,
+      ignoreWidth:false, ignoreHeight:true,
+      ignoreFonts:false, breakPages:true,
+      useBase64URL:true,
+    });
+    area.innerHTML='';
+    area.appendChild(container);
+  }catch(e){
+    area.innerHTML=`<div class="no-preview"><p style="color:var(--danger)">Word 렌더링 실패: ${e.message}</p>
+      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 다운로드</button></div>`;
+  }
+}
+
+
+// ─ 해시태그 Top 10 ─
+let top10Open=true;
+function toggleTop10(){
+  top10Open=!top10Open;
+  document.getElementById('top10Body').style.display=top10Open?'grid':'none';
+  document.getElementById('top10Arrow').textContent=top10Open?'▲':'▼';
+}
+
+function renderTop10(){
+  const freq={};
+  allReports.forEach(r=>r.tags.forEach(t=>{freq[t]=(freq[t]||0)+1;}));
+  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  const wrap=document.getElementById('top10Wrap');
+  const body=document.getElementById('top10Body');
+
+  if(!sorted.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+
+  const maxCnt=sorted[0][1];
+  const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+
+  body.innerHTML=sorted.map(([tag,cnt],i)=>`
+    <div class="top10-item" onclick="filterByTag('${esc(tag)}')">
+      <span class="top10-rank ${rankClass(i)}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
+          <span class="top10-tag">${esc(tag)}</span>
+          <span class="top10-cnt">${cnt}건</span>
+        </div>
+        <div class="top10-bar">
+          <div class="top10-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%"></div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function filterByTag(tag){
+  document.getElementById('searchInp').value=tag;
+  applySearch();
+  // 부드럽게 스크롤
+  document.querySelector('.search-wrap').scrollIntoView({behavior:'smooth',block:'center'});
+}
 // ─ PDF.js 렌더링 ─
 async function renderPDF(blob, area, rid){
   if(typeof pdfjsLib==='undefined'){
@@ -843,11 +1077,17 @@ async function loadPreview(r){
       const text=await blob.text();
       area.innerHTML=`<pre class="preview-text">${esc(text.slice(0,50000))}</pre>`;
 
+    } else if(['xlsx','xls','csv'].includes(ext)){
+      await renderXLSX(blob, area, r.id);
+
+    } else if(['docx','doc'].includes(ext)){
+      await renderDOCX(blob, area, r.id);
+
     } else {
       area.innerHTML=`<div class="no-preview">
         <div class="fi">${fileIcon(r.filename)}</div>
         <p style="margin-bottom:12px">이 형식은 브라우저에서 미리보기 불가</p>
-        <button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기 (새 탭 / 다운로드)</button>
+        <button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 파일 열기 (다운로드)</button>
       </div>`;
     }
   }catch(e){
@@ -897,11 +1137,12 @@ function showToast(msg,type=''){
 }
 
 // ═══ Close on overlay click / ESC ═══
-['upModal','dtModal','folderModal'].forEach(id=>{
+['upModal','dtModal','folderModal','dupModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){
     if(e.target===this){
       if(id==='upModal') closeUpModal();
       else if(id==='dtModal') closeDtModal();
+      else if(id==='dupModal') closeDupModal();
       else closeFolderModal();
     }
   });
