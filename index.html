@@ -1274,9 +1274,15 @@ function renderTop10(){
 }
 
 function filterByTag(tag){
-  document.getElementById('searchInp').value=tag;
+  const inp=document.getElementById('searchInp');
+  const cur=inp.value.trim();
+  const tags=cur.split(/\s+/).filter(Boolean);
+  if(tags.some(t=>t.toLowerCase()===tag.toLowerCase())){
+    showToast('이미 선택된 태그입니다','w');
+    return;
+  }
+  inp.value=(cur ? cur+' ' : '')+tag;
   applySearch();
-  // 부드럽게 스크롤
   document.querySelector('.search-wrap').scrollIntoView({behavior:'smooth',block:'center'});
 }
 // ─ PDF.js 렌더링 ─
@@ -1473,7 +1479,20 @@ async function delReport(id){
   if(!confirm('삭제하시겠습니까?\n파일 원본은 삭제되지 않습니다.'))return;
   await dbDel(id); closeDtModal(); await loadReports(); showToast('🗑️ 삭제됐습니다','ok');
 }
-function tagSearch(t){closeDtModal();document.getElementById('searchInp').value=t;applySearch();}
+
+function tagSearch(tag){
+  closeDtModal();
+  const inp=document.getElementById('searchInp');
+  const cur=inp.value.trim();
+  const tags=cur.split(/\s+/).filter(Boolean);
+  if(tags.some(t=>t.toLowerCase()===tag.toLowerCase())){
+    showToast('이미 선택된 태그입니다','w');
+    return;
+  }
+  inp.value=(cur ? cur+' ' : '')+tag;
+  applySearch();
+}
+
 
 // ═══ Export / Import (백업 & 복원) ═══
 async function exportData(){
