@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>👨‍🔧비정상 상황 보고서 관리</title>
+<title>🔧 트러블슈팅 레포트 관리</title>
 <style>
 :root {
   --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --surface3:#2a2f45;
@@ -300,8 +300,8 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 
 <!-- ═══ HEADER ═══ -->
 <header>
-  <span style="font-size:1.4rem">👨‍🔧</span>
-  <h1>비정상 상황 보고서 관리</h1>
+  <span style="font-size:1.4rem">🔧</span>
+  <h1>트러블슈팅 레포트 관리</h1>
   <span class="badge" id="totalBadge">0건</span>
   <button id="toggleUploadBtn" onclick="togglePanel()">
     📂 파일 등록 <em class="arrow">▲</em>
@@ -346,7 +346,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
   <!-- 해시태그 Top 10 -->
   <div class="top10-wrap" id="top10Wrap" style="display:none">
     <div class="top10-header" onclick="toggleTop10()">
-      <h3>🏷️ 해시태그 순위</h3>
+      <h3>🏷️ 해시태그 Top 10</h3>
       <span class="top10-toggle" id="top10Arrow">▲</span>
     </div>
     <div id="top10Body" class="top10-body"></div>
@@ -631,15 +631,13 @@ const TAG_SYNONYMS = {
   '콜':'Coal', '석탄':'Coal',
   '트랜스퍼':'M-T Transfer',
   '워싱':'Washing',
-  
 };
 
-// 수정 후 (입력한 대로 표기)
 function normalizeTag(raw){
   if(!raw) return '';
-  const trimmed=String(raw).trim().replace(/^#+/,'').trim(); // ← 원본 보존
+  const trimmed=String(raw).trim().replace(/^#+/,'').trim();
   const up=trimmed.toUpperCase();
-  return TAG_SYNONYMS[up] || trimmed;  // ← 동의어 없으면 원본 케이스 반환
+  return TAG_SYNONYMS[up] || trimmed;
 }
 
 // ═══ Tags ═══
@@ -1186,10 +1184,13 @@ function toggleTop10(){
 
 function renderTop10(){
   const freq={};
+  const display={};
   allReports.forEach(r=>(r.tags||[]).forEach(t=>{
-    const k='#'+normalizeTag(t);
-    if(k==='#') return;
-    freq[k]=(freq[k]||0)+1;
+    const norm=normalizeTag(t);
+    if(!norm) return;
+    const key='#'+norm.toLowerCase();
+    if(!display[key]) display[key]='#'+norm;
+    freq[key]=(freq[key]||0)+1;
   }));
   const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
 
@@ -1202,7 +1203,9 @@ function renderTop10(){
   const maxCnt=sorted[0][1];
   const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
 
-  body.innerHTML=sorted.map(([tag,cnt],i)=>`
+  body.innerHTML=sorted.map(([key,cnt],i)=>{
+    const tag=display[key]||key;
+    return `
     <div class="top10-item" onclick="filterByTag('${esc(tag)}')">
       <span class="top10-rank ${rankClass(i)}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
       <div style="flex:1;min-width:0">
@@ -1214,7 +1217,8 @@ function renderTop10(){
           <div class="top10-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%"></div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function filterByTag(tag){
