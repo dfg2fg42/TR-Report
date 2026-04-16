@@ -990,17 +990,17 @@ let dbt;
 document.getElementById('searchInp').addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applySearch,170);});
 
 function applySearch(){
-  const raw=document.getElementById('searchInp').value.trim().toLowerCase();
-  // #태그는 다음 #이 나올 때까지 한 덩어리로 묶음 (멀티워드 태그 대응)
+  const orig=document.getElementById('searchInp').value.trim(); // ← 원본 케이스 보존
+  const raw=orig.toLowerCase();                                  // ← 비교용 소문자
   const toks=[];
   const re=/#[^#]*/g; let last=0, m;
-  while((m=re.exec(raw))!==null){
-    const plain=raw.slice(last,m.index).trim();
+  while((m=re.exec(orig))!==null){                              // ← orig 로 토크나이징
+    const plain=orig.slice(last,m.index).trim();
     if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
     toks.push(m[0].trim());
     last=m.index+m[0].length;
   }
-  raw.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
 
   renderActiveFilters(tf,xt);
@@ -1026,11 +1026,23 @@ function renderActiveFilters(tf,xt){
   c.innerHTML='<span style="font-size:.75rem;color:var(--muted)">필터:</span>'+
     all.map(f=>`<span class="filter-chip" onclick="rmFilter('${esc(f)}')">${esc(f)} ✕</span>`).join('');
 }
+
 function rmFilter(f){
   const inp=document.getElementById('searchInp');
-  inp.value=inp.value.split(/\s+/).filter(p=>p.toLowerCase()!==f.toLowerCase()).join(' ');
+  const orig=inp.value.trim();          // ← 원본 케이스 보존
+  const toks=[];
+  const re=/#[^#]*/g; let last=0, m;
+  while((m=re.exec(orig))!==null){      // ← orig 로 토크나이징
+    const plain=orig.slice(last,m.index).trim();
+    if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+    toks.push(m[0].trim());
+    last=m.index+m[0].length;
+  }
+  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+  inp.value=toks.filter(p=>p.toLowerCase()!==f.toLowerCase()).join(' '); // ← 비교만 소문자
   applySearch();
 }
+
 function clearSearch(){document.getElementById('searchInp').value='';applySearch();}
 
 // ═══ Detail Modal ═══
@@ -1275,16 +1287,30 @@ function renderTop10(){
 
 function filterByTag(tag){
   const inp=document.getElementById('searchInp');
-  const cur=inp.value.trim();
-  const tags=cur.split(/\s+/).filter(Boolean);
-  if(tags.some(t=>t.toLowerCase()===tag.toLowerCase())){
-    showToast('이미 선택된 태그입니다','w');
-    return;
+  const raw=inp.value.trim().toLowerCase();
+  const toks=[];
+  const re=/#[^#]*/g; let last=0, m;
+  while((m=re.exec(raw))!==null){
+    const plain=raw.slice(last,m.index).trim();
+    if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+    toks.push(m[0].trim());
+    last=m.index+m[0].length;
   }
-  inp.value=(cur ? cur+' ' : '')+tag;
+  raw.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+
+  const already=toks.some(t=>t.toLowerCase()===tag.toLowerCase());
+  if(already){
+    // 이미 선택된 태그 → 제거 (토글 OFF)
+    inp.value=toks.filter(t=>t.toLowerCase()!==tag.toLowerCase()).join(' ');
+  } else {
+    // 없는 태그 → 추가 (토글 ON)
+    inp.value=(inp.value.trim() ? inp.value.trim()+' ' : '')+tag;
+  }
   applySearch();
   document.querySelector('.search-wrap').scrollIntoView({behavior:'smooth',block:'center'});
 }
+
+
 // ─ PDF.js 렌더링 ─
 async function renderPDF(blob, area, rid){
   if(typeof pdfjsLib==='undefined'){
