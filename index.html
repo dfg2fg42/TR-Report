@@ -604,8 +604,15 @@ const TAG_SYNONYMS = {
   '진동':'Vibration', 'VIB':'Vibration',
   '오일':'Oil', '버너':'BNR', '루브오일':'Lube Oil',
   '스토리지베슬':'Storage Vessel', '스토리지 베슬':'Storage Vessel', '베슬':'Vessel',
-  '리크':'Leak',
-  '런백':'RunBack',
+  '스토리지탱크':'Storage Tank',
+  '드레인':'Drain',
+  '데미':'Demi Water',
+  '서비스워터':'Service Water',
+  '리크':'Leak', '누수':'Leak',
+  '런백':'RunBack', '런다운':'RunDown',
+  '드래프트':'Draft', '드레프트':'Draft',
+  '흡수탑':'Absorber', '압소바':'Absorber', '압소버':'Absorber', '업소버':'Absorber', '업소바':'Absorber', 
+  '스택':'Stack', 
   '터빈':'TBN', 'TURBINE':'TBN',
   '보일러':'BLR', 'BOILER':'BLR',
   '고압히터':'HP Heater', '저압히터':'LP Heater',
@@ -650,8 +657,13 @@ const TAG_SYNONYMS = {
   '온도':'Temp',
   '콜피더':'Coal Feeder',
   '아토마이징':'Atomizing', '오토마이징':'Atomizing',
+  '콜사일로':'Coal Silo',
+  '씰스팀':'Seal Steam',
+  '스팀':'Steam',
+  '이머전시':'Emergency',
+  '어브노말':'Abnormal Pond', '어브노멀':'Abnormal Pond',
   
-
+  
 };
 
 function normalizeTag(raw){
@@ -968,19 +980,30 @@ function renderReports(list){
 // ═══ Search ═══
 let dbt;
 document.getElementById('searchInp').addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applySearch,170);});
+
 function applySearch(){
   const raw=document.getElementById('searchInp').value.trim().toLowerCase();
-  const toks=raw.split(/\s+/).filter(Boolean);
+  // #태그는 다음 #이 나올 때까지 한 덩어리로 묶음 (멀티워드 태그 대응)
+  const toks=[];
+  const re=/#[^#]*/g; let last=0, m;
+  while((m=re.exec(raw))!==null){
+    const plain=raw.slice(last,m.index).trim();
+    if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+    toks.push(m[0].trim());
+    last=m.index+m[0].length;
+  }
+  raw.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
+
   renderActiveFilters(tf,xt);
   let f=allReports;
-  if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
-    const normSearch=normalizeTag(searchTag.slice(1));
-    return (r.tags||[]).some(g=>{
-      const normG=normalizeTag(g);
-      return normG===normSearch || g.toLowerCase().includes(searchTag);
-    });
-  }));
+if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
+  const normSearch=normalizeTag(searchTag.slice(1)).toLowerCase();
+  return (r.tags||[]).some(g=>{
+    const normG=normalizeTag(g).toLowerCase();
+    return normG===normSearch;
+  });
+}));
   if(xt.length) f=f.filter(r=>xt.every(t=>{
     const normT=normalizeTag(t);
     return r.filename.toLowerCase().includes(t)||
