@@ -46,7 +46,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
   transition:max-height .35s cubic-bezier(.4,0,.2,1), padding .3s ease;
   padding:0 20px;
 }
-.upload-panel.open { max-height:160px; padding:16px 20px; }
+.upload-panel.open { max-height:260px; padding:16px 20px; }
 .upload-inner {
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   max-width:1200px; margin:0 auto;
@@ -225,8 +225,6 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 .toast.err { border-color:var(--danger); color:var(--danger); }
 .toast.w { border-color:var(--warn); color:var(--warn); }
 
-input[type="date"] { color-scheme:dark; }
-#upDate::placeholder { color:var(--muted); font-size:.8rem; }
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:var(--bg); }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
@@ -321,6 +319,10 @@ input[type="date"] { color-scheme:dark; }
     <div class="panel-actions">
       <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택 (경로 직접)</button>
       <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
+      <button class="btn btn-success" onclick="exportData()">💾 백업 (JSON)</button>
+      <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (JSON)</button>
+      <input type="file" id="importInput" style="display:none" accept=".json"
+             onchange="importData(this.files[0]);this.value=''">
       <button class="btn btn-ghost" onclick="togglePanel()">✕ 닫기</button>
     </div>
   </div>
@@ -369,23 +371,24 @@ input[type="date"] { color-scheme:dark; }
 <div class="overlay" id="upModal">
   <div class="modal">
     <h2 id="upTitle">📋 레포트 정보 입력</h2>
-    <div class="fg"><label>파일명</label><div class="fname-box" id="upFilename"></div></div>
-    <div class="fg" id="replaceFileSec" style="display:none">
-      <label>파일 교체 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">(선택 사항 — 다른 파일로 교체)</span></label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div class="fname-box" id="newFilenamebox" style="flex:1;color:var(--muted);font-style:italic">교체할 파일 미선택</div>
-        <button class="btn btn-warn btn-sm" type="button" onclick="pickReplaceFile()">📂 파일 선택</button>
-        <input type="file" id="replaceFileInput" style="display:none"
-               onchange="handleReplaceFileDrop(this.files[0]);this.value=''">
+    <div class="fg">
+      <label>파일명</label>
+      <div class="fname-box" id="upFilename"></div>
+      <div id="replaceFileFg" style="display:none;margin-top:8px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="fname-box" id="replaceFilename" style="flex:1;color:var(--muted);font-style:italic;min-width:140px">교체할 파일을 선택하세요</div>
+          <button class="btn btn-warn btn-sm" type="button" onclick="selectReplaceFile()">🔄 파일 교체</button>
+          <input type="file" id="replaceFileInput" style="display:none" onchange="onReplaceFileSelected(this.files[0]);this.value=''">
+        </div>
       </div>
     </div>
     <div class="fg">
       <label>발생 일자</label>
-      <input type="text" id="upDate" placeholder="26-04-01 또는 2026-04-01" autocomplete="off" spellcheck="false">
+      <input type="text" id="upDate" placeholder="YY-MM-DD  예) 26-04-16" maxlength="8" autocomplete="off" style="letter-spacing:.05em">
       <div class="date-hint" id="upDateHint"></div>
     </div>
     <div class="fg">
-      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">(Space 또는 Enter로 추가)</span></label>
+      <label>해시태그 <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.73rem">(Enter로 추가, 띄어쓰기 포함 가능)</span></label>
       <div class="tags-wrap" id="tagsWrap">
         <input type="text" class="tinput" id="tinput" placeholder="#보일러  #압력  #긴급  #SOx ...">
       </div>
@@ -543,25 +546,6 @@ function fmtDate(s){
   if(!s) return '날짜 미지정';
   const[y,m,d]=s.split('-'); return `${y}년 ${+m}월 ${+d}일`;
 }
-// YY-MM-DD, YYYY-MM-DD, YYMMDD, YYYYMMDD → YYYY-MM-DD 정규화
-function parseManualDate(str){
-  if(!str) return '';
-  str=str.trim().replace(/[./]/g,'-');
-  let m;
-  // YYYY-MM-DD
-  m=str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(m&&+m[1]>=2000) return `${m[1]}-${m[2]}-${m[3]}`;
-  // YY-MM-DD (26-04-01 → 2026-04-01)
-  m=str.match(/^(\d{2})-(\d{2})-(\d{2})$/);
-  if(m&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31) return `20${m[1]}-${m[2]}-${m[3]}`;
-  // YYYYMMDD
-  m=str.match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/);
-  if(m&&+m[1]>=2000) return `${m[1]}-${m[2]}-${m[3]}`;
-  // YYMMDD (260401 → 2026-04-01)
-  m=str.match(/^(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/);
-  if(m) return `20${m[1]}-${m[2]}-${m[3]}`;
-  return str;
-}
 function fileIcon(n){
   const e=n.split('.').pop().toLowerCase();
   return {pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',ppt:'📑',pptx:'📑',
@@ -575,12 +559,80 @@ function fmtSize(b){
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+// ═══ Date Display Helpers (2자리 연도) ═══
+function toDisplayDate(iso){
+  if(!iso) return '';
+  return iso.length>=10 ? iso.slice(2) : iso;
+}
+function fromDisplayDate(disp){
+  if(!disp) return '';
+  const clean=disp.replace(/[\-\/\.]/g,'');
+  if(clean.length===6){
+    return `20${clean.slice(0,2)}-${clean.slice(2,4)}-${clean.slice(4,6)}`;
+  }
+  return extractDate(disp)||disp;
+}
+function updateDateHintLive(val){
+  const hint=document.getElementById('upDateHint');
+  if(!hint) return;
+  const digits=val.replace(/\D/g,'');
+  if(digits.length===6){
+    const iso=fromDisplayDate(val);
+    hint.textContent='📅 '+fmtDate(iso);
+    hint.className='date-hint ok';
+  } else if(val){
+    hint.textContent='형식: YY-MM-DD (예: 26-04-16)';
+    hint.className='date-hint no';
+  } else {
+    hint.textContent='';
+    hint.className='date-hint';
+  }
+}
+document.getElementById('upDate').addEventListener('input', function(e){
+  let v=e.target.value.replace(/[^\d]/g,'');
+  if(v.length>2) v=v.slice(0,2)+'-'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'-'+v.slice(5);
+  if(v.length>8) v=v.slice(0,8);
+  e.target.value=v;
+  updateDateHintLive(v);
+});
+
+// ═══ Tag Synonyms (동의어 매핑) ═══
+const TAG_SYNONYMS = {
+  '미분기':'PULV', 'PULVERIZER':'PULV', '클래시파이어':'CLASSIFIER',
+  '튜브':'TUBE',
+  '진동':'VIBRATION', 'VIB':'VIBRATION',
+  '오일':'OIL', '버너':'BNR',
+  '스토리지베슬':'STG', '스토리지 베슬':'STG', '베슬':'VESSEL',
+  '리크':'LEAK',
+  '런백':'RUNBACK',
+  '터빈':'TBN', 'TURBINE':'TBN',
+  '보일러':'BLR', 'BOILER':'BLR',
+  '히터':'HEATER',
+  '프로텍션':'PROTECTION', 'PROT':'PROTECTION',
+  '슬립':'SLIP',
+  '메탈':'METAL',
+  '급전':'KPX',
+  '스캐너':'SCANNER',
+  '발전기':'GEN', 'GENERATOR':'GEN',
+  '댐퍼':'DAMPER',
+  '베어링':'BRG', 'BEARING':'BRG',
+  '연료유':'LIGHT OIL',
+};
+
+function normalizeTag(raw){
+  if(!raw) return '';
+  const up=String(raw).trim().replace(/^#+/,'').trim().toUpperCase();
+  return TAG_SYNONYMS[up] || up;
+}
+
 // ═══ Tags ═══
 let cTags=[];
 function addTag(raw){
-  let t=raw.trim().replace(/^#+/,'').trim();
-  if(!t)return; t='#'+t;
-  if(!cTags.includes(t)){cTags.push(t);renderChips();}
+  const t=normalizeTag(raw);
+  if(!t)return;
+  const tag='#'+t;
+  if(!cTags.includes(tag)){cTags.push(tag);renderChips();}
 }
 function removeTag(t){cTags=cTags.filter(x=>x!==t);renderChips();}
 function renderChips(){
@@ -597,14 +649,14 @@ function renderChips(){
 const tinput=document.getElementById('tinput');
 tinput.addEventListener('keydown',e=>{
   const v=e.target.value;
-  if(e.key==='Enter'||e.key===' '){e.preventDefault();if(v.trim()){addTag(v);e.target.value='';}}
+  if(e.key==='Enter'){e.preventDefault();if(v.trim()){addTag(v);e.target.value='';}}
   else if(e.key==='Backspace'&&!v&&cTags.length){cTags.pop();renderChips();}
 });
 tinput.addEventListener('blur',e=>{if(e.target.value.trim()){addTag(e.target.value);e.target.value='';}});
 document.getElementById('tagsWrap').addEventListener('click',()=>tinput.focus());
 
 // ═══ File Queue ═══
-let fQueue=[], fIdx=0, editId=null, folderHandles=[], replaceItem=null;
+let fQueue=[], fIdx=0, editId=null, folderHandles=[], replaceFileItem=null;
 
 async function selectFiles(){
   if(!FSA){showToast('Chrome/Edge를 사용해 주세요','err');return;}
@@ -697,16 +749,15 @@ function proceedModal(item, file){
   document.getElementById('upSaveBtn').onclick=saveReport;
   document.getElementById('upFilename').textContent=file.name;
   const d=extractDate(file.name);
-  document.getElementById('upDate').value=d;
+  document.getElementById('upDate').value=toDisplayDate(d);
   const hint=document.getElementById('upDateHint');
   if(d){hint.textContent='✅ 파일명에서 날짜 자동 인식: '+fmtDate(d);hint.className='date-hint ok';}
-  else{hint.textContent='ℹ️ 날짜를 인식하지 못했습니다. 직접 입력해 주세요.';hint.className='date-hint no';}
+  else{hint.textContent='ℹ️ 날짜를 직접 입력해 주세요 (예: 26-04-16)';hint.className='date-hint no';}
   document.getElementById('upMemo').value='';
   const sb=document.getElementById('skipBtn');
   sb.style.display=fQueue.length>1?'inline-flex':'none';
   sb.textContent=`건너뜀 (${fIdx+1}/${fQueue.length}) →`;
   renderChips(); updateQBar();
-  document.getElementById('replaceFileSec').style.display='none';
   document.getElementById('upModal').classList.add('on');
 }
 
@@ -727,7 +778,7 @@ async function saveReport(){
   } else {
     handle=item; file=await handle.getFile();
   }
-  const date=parseManualDate(document.getElementById('upDate').value);
+  const date=fromDisplayDate(document.getElementById('upDate').value);
   const memo=document.getElementById('upMemo').value.trim();
   try{
     await dbAdd({
@@ -743,75 +794,75 @@ async function saveReport(){
 function closeUpModal(){
   document.getElementById('upModal').classList.remove('on');
   document.getElementById('queueBar').style.display='none';
-  document.getElementById('replaceFileSec').style.display='none';
-  fQueue=[]; fIdx=0; editId=null; cTags=[]; replaceItem=null;
-}
-
-// ═══ 파일 교체 ═══
-async function pickReplaceFile(){
-  if(FSA){
-    try{
-      const [h]=await window.showOpenFilePicker({multiple:false});
-      const f=await h.getFile();
-      replaceItem=h;
-      setReplaceUI(f.name);
-    }catch(e){if(e.name!=='AbortError')showToast('오류: '+e.message,'err');}
-  } else {
-    document.getElementById('replaceFileInput').click();
-  }
-}
-function handleReplaceFileDrop(file){
-  if(!file) return;
-  replaceItem={_file:file};
-  setReplaceUI(file.name);
-}
-function setReplaceUI(name){
-  const box=document.getElementById('newFilenamebox');
-  box.textContent=name; box.style.color='var(--warn)'; box.style.fontStyle='normal';
-  document.getElementById('upFilename').innerHTML=
-    document.getElementById('upFilename').textContent+
-    ` <span style="color:var(--warn);font-size:.72rem">→ ${esc(name)}</span>`;
-  showToast('✅ 교체 파일 선택: '+name,'ok');
+  document.getElementById('replaceFileFg').style.display='none';
+  fQueue=[]; fIdx=0; editId=null; cTags=[]; replaceFileItem=null;
 }
 
 // ═══ Edit ═══
 async function openEdit(id){
-  const r=await dbGet(id); editId=id; fQueue=[]; replaceItem=null;
+  const r=await dbGet(id); editId=id; fQueue=[];
   cTags=[...r.tags];
+  replaceFileItem=null;
   document.getElementById('upTitle').textContent='✏️ 레포트 수정';
   document.getElementById('upSaveBtn').textContent='✅ 수정 완료';
   document.getElementById('upSaveBtn').onclick=updateReport;
   document.getElementById('upFilename').textContent=r.filename;
-  document.getElementById('upDate').value=r.date||'';
+  document.getElementById('upDate').value=toDisplayDate(r.date||'');
   document.getElementById('skipBtn').style.display='none';
   document.getElementById('upDateHint').textContent='';
   document.getElementById('upMemo').value=r.memo||'';
-  // 파일 교체 섹션 초기화
-  document.getElementById('replaceFileSec').style.display='block';
-  document.getElementById('newFilenamebox').textContent='교체할 파일 미선택';
-  document.getElementById('newFilenamebox').style.color='var(--muted)';
-  document.getElementById('newFilenamebox').style.fontStyle='italic';
+  // 파일 교체 섹션 표시
+  const rfg=document.getElementById('replaceFileFg');
+  rfg.style.display='block';
+  const rn=document.getElementById('replaceFilename');
+  rn.textContent='교체할 파일을 선택하세요 (선택하지 않으면 기존 파일 유지)';
+  rn.style.color='var(--muted)'; rn.style.fontStyle='italic';
   renderChips(); closeDtModal();
   document.getElementById('upModal').classList.add('on');
 }
 async function updateReport(){
   const v=tinput.value.trim(); if(v){addTag(v);tinput.value='';}
   const r=await dbGet(editId);
-  r.date=parseManualDate(document.getElementById('upDate').value);
+  r.date=fromDisplayDate(document.getElementById('upDate').value);
   r.tags=[...cTags];
   r.memo=document.getElementById('upMemo').value.trim();
-  // ── 파일 교체 ──
-  if(replaceItem){
-    let newFile, newHandle=null, newBuf=null;
-    if(replaceItem._file){
-      newFile=replaceItem._file; newBuf=await newFile.arrayBuffer();
-    } else {
-      newHandle=replaceItem; newFile=await newHandle.getFile();
-    }
-    r.fileHandle=newHandle; r.fileData=newBuf;
-    r.filename=newFile.name; r.fileSize=newFile.size; r.fileType=newFile.type;
+  // ── 파일 교체 처리 ──
+  if(replaceFileItem){
+    const {handle,file,buf}=replaceFileItem;
+    r.fileHandle=handle;
+    r.fileData=buf;
+    r.filename=file.name;
+    r.fileSize=file.size;
+    r.fileType=file.type||getMime(file.name);
+    replaceFileItem=null;
   }
   await dbPut(r); closeUpModal(); await loadReports(); showToast('✅ 수정됐습니다','ok');
+}
+
+// ═══ File Replace (수정 시 파일 교체) ═══
+async function selectReplaceFile(){
+  if(FSA){
+    try{
+      const [h]=await window.showOpenFilePicker({multiple:false});
+      const f=await h.getFile();
+      replaceFileItem={handle:h,file:f,buf:null};
+      const rn=document.getElementById('replaceFilename');
+      rn.textContent='✅ '+f.name;
+      rn.style.color='var(--success)'; rn.style.fontStyle='normal';
+      showToast('📎 교체 파일 선택됨: '+f.name,'ok');
+    }catch(e){if(e.name!=='AbortError')showToast('오류: '+e.message,'err');}
+  } else {
+    document.getElementById('replaceFileInput').click();
+  }
+}
+async function onReplaceFileSelected(file){
+  if(!file) return;
+  const buf=await file.arrayBuffer();
+  replaceFileItem={handle:null,file,buf};
+  const rn=document.getElementById('replaceFilename');
+  rn.textContent='✅ '+file.name;
+  rn.style.color='var(--success)'; rn.style.fontStyle='normal';
+  showToast('📎 교체 파일 선택됨: '+file.name,'ok');
 }
 
 // ═══ Folder Modal ═══
@@ -857,7 +908,7 @@ function updateStats(){
   const n=allReports.length;
   document.getElementById('totalBadge').textContent=n+'건';
   document.getElementById('stTotal').textContent=n;
-  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>r.tags)).size;
+  document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>(r.tags||[])).map(t=>'#'+normalizeTag(t)).filter(t=>t!=='#')).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
   renderTop10();
@@ -888,12 +939,19 @@ function applySearch(){
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
   renderActiveFilters(tf,xt);
   let f=allReports;
-  if(tf.length) f=f.filter(r=>tf.every(t=>r.tags.some(g=>g.toLowerCase().includes(t))));
-  if(xt.length) f=f.filter(r=>xt.every(t=>
-    r.filename.toLowerCase().includes(t)||
+  if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
+    const normSearch=normalizeTag(searchTag.slice(1));
+    return (r.tags||[]).some(g=>{
+      const normG=normalizeTag(g);
+      return normG===normSearch || g.toLowerCase().includes(searchTag);
+    });
+  }));
+  if(xt.length) f=f.filter(r=>xt.every(t=>{
+    const normT=normalizeTag(t);
+    return r.filename.toLowerCase().includes(t)||
     (r.memo&&r.memo.toLowerCase().includes(t))||
-    r.tags.some(g=>g.toLowerCase().includes(t))
-  ));
+    (r.tags||[]).some(g=>g.toLowerCase().includes(t)||normalizeTag(g)===normT);
+  }));
   renderReports(f);
 }
 function renderActiveFilters(tf,xt){
@@ -1112,8 +1170,12 @@ function toggleTop10(){
 
 function renderTop10(){
   const freq={};
-  allReports.forEach(r=>r.tags.forEach(t=>{freq[t]=(freq[t]||0)+1;}));
-  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  allReports.forEach(r=>(r.tags||[]).forEach(t=>{
+    const k='#'+normalizeTag(t);
+    if(k==='#') return;
+    freq[k]=(freq[k]||0)+1;
+  }));
+  const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
 
   const wrap=document.getElementById('top10Wrap');
   const body=document.getElementById('top10Body');
@@ -1340,6 +1402,61 @@ async function delReport(id){
   await dbDel(id); closeDtModal(); await loadReports(); showToast('🗑️ 삭제됐습니다','ok');
 }
 function tagSearch(t){closeDtModal();document.getElementById('searchInp').value=t;applySearch();}
+
+// ═══ Export / Import (백업 & 복원) ═══
+async function exportData(){
+  const data=await dbAll();
+  const exportable=data.map(r=>{
+    const obj={
+      filename:r.filename, fileSize:r.fileSize||0, fileType:r.fileType||'',
+      date:r.date||'', tags:r.tags||[], memo:r.memo||'', createdAt:r.createdAt||''
+    };
+    if(r.fileData){
+      const bytes=new Uint8Array(r.fileData);
+      let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
+      obj.fileDataB64=btoa(bin);
+    }
+    return obj;
+  });
+  const json=JSON.stringify({version:1,exportedAt:new Date().toISOString(),reports:exportable},null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const d=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href=url; a.download=`troubleshoot_backup_${d}.json`; a.style.display='none';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+  showToast(`✅ ${exportable.length}건 백업 완료`,'ok');
+}
+
+async function importData(file){
+  if(!file) return;
+  try{
+    const text=await file.text();
+    const data=JSON.parse(text);
+    const reports=data.reports||data;
+    if(!Array.isArray(reports)) throw new Error('올바른 백업 파일이 아닙니다');
+    let count=0;
+    for(const r of reports){
+      let fileData=null;
+      if(r.fileDataB64){
+        const bin=atob(r.fileDataB64);
+        const bytes=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+        fileData=bytes.buffer;
+      }
+      await dbAdd({
+        fileHandle:null, fileData,
+        filename:r.filename||'알수없음', fileSize:r.fileSize||0, fileType:r.fileType||'',
+        date:r.date||'', tags:r.tags||[], memo:r.memo||'',
+        createdAt:r.createdAt||new Date().toISOString()
+      });
+      count++;
+    }
+    await loadReports();
+    showToast(`✅ ${count}건 복원 완료`,'ok');
+  }catch(e){showToast('❌ 복원 실패: '+e.message,'err');}
+}
 
 // ═══ Toast ═══
 function showToast(msg,type=''){
