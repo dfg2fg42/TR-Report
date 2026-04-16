@@ -634,10 +634,12 @@ const TAG_SYNONYMS = {
   
 };
 
+// 수정 후 (입력한 대로 표기)
 function normalizeTag(raw){
   if(!raw) return '';
-  const up=String(raw).trim().replace(/^#+/,'').trim().toUpperCase();
-  return TAG_SYNONYMS[up] || up;
+  const trimmed=String(raw).trim().replace(/^#+/,'').trim(); // ← 원본 보존
+  const up=trimmed.toUpperCase();
+  return TAG_SYNONYMS[up] || trimmed;  // ← 동의어 없으면 원본 케이스 반환
 }
 
 // ═══ Tags ═══
