@@ -729,7 +729,7 @@ const TAG_SYNONYMS = {
   '튜브':'Tube',
   '진동':'Vibration', 'VIB':'Vibration',
   '오일':'Oil', '버너':'BNR', '루브오일':'Lube Oil',
-  '스토리지베슬':'Storage Vessel', '스토리지 베슬':'Storage Vessel', '베슬':'Vessel',
+  '스토리지베슬':'Storage Vessel', '스토리지배슬':'Storage Vessel', '베슬':'Vessel', '배슬':'Vessel',
   '스토리지탱크':'Storage Tank',
   '드레인':'Drain',
   '데미':'Demi Water',
@@ -795,10 +795,37 @@ const TAG_SYNONYMS = {
   '테스트':'Test',
   '폴트':'Fault',
   '캡스':'Keps', '켑스':'Keps',
+  '서비스에어':'Service Air',
+  '세컨':'Secondary Air',
+  '인스트로':'Instrument Air',
   
   
   
 };
+
+// ═══ LocalStorage 동의어 영구 저장 ═══
+const SYN_STORAGE_KEY = 'troubleshoot_tag_synonyms';
+
+function saveSynonymsToStorage() {
+  try {
+    localStorage.setItem(SYN_STORAGE_KEY, JSON.stringify(TAG_SYNONYMS));
+  } catch(e) { console.warn('동의어 저장 실패:', e); }
+}
+
+function loadSynonymsFromStorage() {
+  try {
+    const saved = localStorage.getItem(SYN_STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      // 기존 키 유지하면서 저장된 값으로 덮어쓰기
+      Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
+      Object.assign(TAG_SYNONYMS, data);
+    }
+  } catch(e) { console.warn('동의어 불러오기 실패:', e); }
+}
+
+// 페이지 로드 시 즉시 복원
+loadSynonymsFromStorage();
 
 function normalizeTag(raw){
   if(!raw) return '';
@@ -1969,6 +1996,7 @@ function confirmEdit(oldKey) {
   }
   if (newKey !== oldKey) delete TAG_SYNONYMS[oldKey];
   TAG_SYNONYMS[newKey] = newVal;
+  saveSynonymsToStorage();
   _editingKey = null;
   renderSynTable(document.getElementById('synSearchInp').value);
   showToast(`✅ 수정됨: ${newKey} → ${newVal}`, 'ok');
@@ -1985,6 +2013,7 @@ function addSynRow() {
   if (!k || !v) { showToast('키워드와 태그명을 모두 입력하세요', 'w'); return; }
   if (TAG_SYNONYMS[k]) { showToast(`이미 존재합니다: ${k} → ${TAG_SYNONYMS[k]}`, 'w'); return; }
   TAG_SYNONYMS[k] = v;
+  saveSynonymsToStorage();
   document.getElementById('synKeyInp').value = '';
   document.getElementById('synValInp').value = '';
   renderSynTable(document.getElementById('synSearchInp').value);
@@ -1996,6 +2025,7 @@ function addSynRow() {
 function deleteSynRow(key) {
   if (!confirm(`"${key}" 동의어를 삭제할까요?`)) return;
   delete TAG_SYNONYMS[key];
+  saveSynonymsToStorage();
   renderSynTable(document.getElementById('synSearchInp').value);
   showToast(`🗑️ 삭제됨: ${key}`, 'ok');
 }
@@ -2004,6 +2034,7 @@ function resetSynonyms() {
   if (!confirm('모든 동의어를 기본값으로 복원할까요?')) return;
   Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
   Object.assign(TAG_SYNONYMS, DEFAULT_TAG_SYNONYMS);
+  saveSynonymsToStorage();
   renderSynTable(document.getElementById('synSearchInp').value);
   showToast('🔄 기본값으로 복원됐습니다', 'ok');
 }
@@ -2029,6 +2060,7 @@ async function importSynonyms(file) {
     if (typeof data !== 'object') throw new Error('잘못된 형식');
     Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
     Object.assign(TAG_SYNONYMS, data);
+    saveSynonymsToStorage();
     renderSynTable('');
     showToast(`✅ ${Object.keys(data).length}개 동의어 가져오기 완료`, 'ok');
   } catch(e) { showToast('가져오기 실패: ' + e.message, 'err'); }
