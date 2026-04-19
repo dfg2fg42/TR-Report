@@ -111,7 +111,14 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
                -webkit-box-orient:vertical; overflow:hidden; line-height:1.6; }
 .report-tags { display:flex; flex-wrap:wrap; gap:4px; }
 .report-tag { background:var(--tag-bg); color:var(--tag-text);
-              padding:2px 8px; border-radius:12px; font-size:.74rem; }
+              padding:2px 8px; border-radius:12px; font-size:.74rem;
+              transition:all .15s; }
+.report-tag.active {
+  background:rgba(57,255,20,.12);
+  color:#39ff14;
+  font-weight:700;
+  box-shadow:0 0 0 1px rgba(57,255,20,.5);
+}
 
 /* ── Queue bar ── */
 .queue-bar {
@@ -1180,7 +1187,17 @@ function renderReports(list){
       </div>
       <div class="report-name" title="${esc(r.filename)}">${esc(r.filename)}</div>
       <div class="report-memo">${r.memo?esc(r.memo):'<span style="color:var(--muted);font-style:italic">메모 없음</span>'}</div>
-      <div class="report-tags">${r.tags.map(t=>`<span class="report-tag">${esc(t)}</span>`).join('')}</div>
+      <div class="report-tags">${(()=>{
+  const _sv=document.getElementById('searchInp').value.trim().toLowerCase();
+  const _at=new Set();
+  const _re=/#[^#]+/g; let _rm;
+  while((_rm=_re.exec(_sv))!==null) _at.add(_rm[0].trim().replace(/\s+$/,''));
+  return r.tags.map(t=>{
+    const _tl=t.toLowerCase();
+    const _act=_at.has(_tl)||Array.from(_at).some(a=>a===_tl);
+    return `<span class="report-tag${_act?' active':''}">${esc(t)}</span>`;
+  }).join('');
+})()}</div>
     </div>`).join('');
 }
 
