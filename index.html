@@ -1470,8 +1470,8 @@ const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
 // 현재 검색창 활성 태그 추출
 const _searchVal=document.getElementById('searchInp').value.trim().toLowerCase();
 const activeTags=new Set();
-const _re=/#\S+/g; let _m;
-while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim());
+const _re=/#[^#]+/g; let _m;
+while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim().replace(/\s+$/,""));
 
 body.innerHTML=sorted.map(([key,cnt],i)=>{
   const tag=display[key]||key;
@@ -1494,28 +1494,29 @@ body.innerHTML=sorted.map(([key,cnt],i)=>{
   }).join('');
 }
 
-function filterByTag(tag) {
-  const inp = document.getElementById('searchInp');
-  const orig = inp.value.trim(); // ← toLowerCase() 제거, 원본 케이스 보존
-  const toks = [];
-  const reg = /#[^#]*/g;
-  let last = 0, m;
-  while ((m = reg.exec(orig)) !== null) {
-    const plain = orig.slice(last, m.index).trim();
-    if (plain) plain.split(/\s+/).filter(Boolean).forEach(w => toks.push(w));
+function filterByTag(tag){
+  const inp=document.getElementById('searchInp');
+  const orig=inp.value.trim();
+  const toks=[];
+  const re=/#[^#]*/g; let last=0, m;
+  while((m=re.exec(orig))!==null){
+    const plain=orig.slice(last,m.index).trim();
+    if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
     toks.push(m[0].trim());
-    last = m.index + m[0].length;
+    last=m.index+m[0].length;
   }
-  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w => toks.push(w));
+  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
 
-  const already = toks.some(t => t.toLowerCase() === tag.toLowerCase()); // 비교만 소문자
-  if (already) { // OFF
-    inp.value = toks.filter(t => t.toLowerCase() !== tag.toLowerCase()).join(' ');
-  } else { // ON
-    inp.value = (inp.value.trim() ? inp.value.trim() + ' ' : '') + tag;
+  const already=toks.some(t=>t.toLowerCase()===tag.toLowerCase());
+  if(already){
+    // 이미 선택된 태그 → 제거 (토글 OFF)
+    inp.value=toks.filter(t=>t.toLowerCase()!==tag.toLowerCase()).join(' ');
+  } else {
+    // 없는 태그 → 추가 (토글 ON)
+    inp.value=(inp.value.trim() ? inp.value.trim()+' ' : '')+tag;
   }
   applySearch();
-  document.querySelector('.search-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.querySelector('.search-wrap').scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 
