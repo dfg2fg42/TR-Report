@@ -288,6 +288,84 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
                          font-size:.72rem;font-weight:700;flex-shrink:0;margin-top:1px;}
 .kbd{background:var(--surface3);border:1px solid var(--border);border-radius:4px;
      padding:1px 6px;font-size:.78rem;font-family:monospace;color:var(--text);}
+
+/* ── Search Autocomplete ── */
+.search-wrap { position:relative; }
+.autocomplete-list {
+  position:absolute; top:calc(100% + 6px); left:0; right:0;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:var(--radius); z-index:200; max-height:260px;
+  overflow-y:auto; box-shadow:0 8px 24px rgba(0,0,0,.35);
+  display:none;
+}
+.autocomplete-list.show { display:block; }
+.ac-item {
+  display:flex; align-items:center; gap:8px;
+  padding:9px 14px; cursor:pointer; font-size:.85rem;
+  transition:background .12s;
+}
+.ac-item:hover, .ac-item.active { background:var(--accent2); }
+.ac-item .ac-tag { color:var(--tag-text); font-weight:600; flex:1; }
+.ac-item .ac-orig { color:var(--muted); font-size:.75rem; }
+.ac-item .ac-cnt { background:rgba(79,142,247,.15); color:var(--accent);
+                    padding:1px 7px; border-radius:10px; font-size:.72rem; }
+
+/* ── Settings Modal ── */
+.settings-btn {
+  background:transparent; border:none; cursor:pointer;
+  color:var(--muted); font-size:1.15rem; padding:4px 8px;
+  border-radius:6px; transition:all .18s; line-height:1;
+  display:flex; align-items:center;
+}
+.settings-btn:hover { background:var(--surface2); color:var(--text); transform:rotate(45deg); }
+.syn-table { width:100%; border-collapse:collapse; margin-bottom:10px; }
+.syn-table th { font-size:.72rem; color:var(--muted); text-transform:uppercase;
+                letter-spacing:.05em; padding:5px 8px; text-align:left;
+                border-bottom:1px solid var(--border); }
+.syn-table td { padding:5px 8px; font-size:.83rem; vertical-align:middle; }
+.syn-table tr:hover td { background:rgba(79,142,247,.05); }
+.syn-row-input { background:var(--surface3); border:1px solid var(--border);
+                 border-radius:6px; padding:5px 9px; color:var(--text);
+                 font-size:.83rem; font-family:inherit; outline:none; width:100%; }
+.syn-row-input:focus { border-color:var(--accent); }
+.syn-del { background:transparent; border:none; cursor:pointer; color:var(--danger);
+           font-size:.85rem; padding:3px 7px; border-radius:5px; opacity:.7;
+           transition:all .15s; }
+.syn-del:hover { background:rgba(248,113,113,.12); opacity:1; }
+.syn-add-row { display:flex; gap:8px; margin-bottom:14px; }
+.syn-add-row input { flex:1; background:var(--surface2); border:1px solid var(--border);
+                     border-radius:8px; padding:8px 12px; color:var(--text);
+                     font-size:.85rem; font-family:inherit; outline:none; }
+.syn-add-row input:focus { border-color:var(--accent); }
+.syn-search-wrap { margin-bottom:10px; }
+.syn-search-wrap input { width:100%; background:var(--surface2); border:1px solid var(--border);
+                          border-radius:8px; padding:7px 12px; color:var(--text);
+                          font-size:.84rem; font-family:inherit; outline:none; }
+.syn-search-wrap input:focus { border-color:var(--accent); }
+.syn-count { font-size:.78rem; color:var(--muted); margin-bottom:8px; }
+
+/* ── Syn table edit mode ── */
+.syn-display { font-size:.84rem; color:var(--text); flex:1; }
+.syn-display.key { color:var(--warn); font-weight:600; }
+.syn-display.val { color:var(--tag-text); font-weight:600; }
+.syn-cell { display:flex; align-items:center; gap:6px; }
+.syn-edit-input { background:var(--surface3); border:1px solid var(--accent);
+                  border-radius:6px; padding:5px 9px; color:var(--text);
+                  font-size:.83rem; font-family:inherit; outline:none; width:100%;
+                  box-shadow:0 0 0 2px rgba(79,142,247,.18); }
+.syn-edit-btn { background:transparent; border:none; cursor:pointer;
+                font-size:.85rem; padding:3px 7px; border-radius:5px;
+                opacity:.55; transition:all .15s; }
+.syn-edit-btn:hover { opacity:1; background:rgba(79,142,247,.12); }
+.syn-confirm { background:transparent; border:none; cursor:pointer; color:var(--success);
+               font-size:.95rem; padding:3px 7px; border-radius:5px;
+               transition:all .15s; }
+.syn-confirm:hover { background:rgba(52,211,153,.12); }
+.syn-cancel { background:transparent; border:none; cursor:pointer; color:var(--muted);
+              font-size:.9rem; padding:3px 6px; border-radius:5px; transition:all .15s; }
+.syn-cancel:hover { background:var(--surface3); color:var(--text); }
+.syn-table td { padding:4px 8px; }
+.syn-table tr.editing td { background:rgba(79,142,247,.06); }
 </style>
 <!-- PDF.js: PDF 렌더링 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -303,6 +381,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
   <span style="font-size:1.4rem">👨‍🔧</span>
   <h1>비정상 상황 보고서 관리</h1>
   <span class="badge" id="totalBadge">0건</span>
+  <button class="settings-btn" id="settingsBtn" onclick="openSettingsModal()" title="동의어 매핑 설정">⚙️</button>
   <button id="toggleUploadBtn" onclick="togglePanel()">
     📂 파일 등록 <em class="arrow">▲</em>
   </button>
@@ -352,10 +431,11 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
     <div id="top10Body" class="top10-body"></div>
   </div>
 
-  <div class="search-wrap">
+  <div class="search-wrap" id="searchWrap">
     <span>🔍</span>
-    <input type="text" id="searchInp" placeholder="#해시태그 또는 키워드로 검색  (예: #보일러  #긴급  압력이상)">
+    <input type="text" id="searchInp" placeholder="#해시태그 또는 키워드로 검색  (예: #보일러  #긴급  압력이상)" autocomplete="off">
     <button class="btn btn-ghost btn-sm" onclick="clearSearch()">초기화</button>
+    <div class="autocomplete-list" id="acList"></div>
   </div>
   <div class="active-filters" id="activeFilters"></div>
 
@@ -461,6 +541,52 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
       <button class="btn btn-ghost" id="dupSkipBtn">⏭ 건너뜀</button>
       <button class="btn btn-warn" id="dupSkipAllBtn" style="display:none">⏭ 중복 전체 건너뜀</button>
       <button class="btn btn-primary" id="dupRegBtn">✅ 그래도 등록</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ SETTINGS MODAL (동의어 매핑) ═══ -->
+<div class="overlay" id="settingsModal">
+  <div class="modal" style="max-width:580px">
+    <h2>⚙️ 동의어 매핑 설정</h2>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px">
+      왼쪽: 입력할 한국어/약어 &nbsp;→&nbsp; 오른쪽: 변환될 태그명
+    </p>
+    <!-- 추가 입력 -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:14px">
+      <div style="font-size:.74rem;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">새 동의어 추가</div>
+      <div class="syn-add-row">
+        <input type="text" id="synKeyInp" placeholder="입력 키워드 (예: 트립)" autocomplete="off">
+        <span style="display:flex;align-items:center;color:var(--muted);font-size:1.1rem">→</span>
+        <input type="text" id="synValInp" placeholder="변환 태그 (예: Trip)" autocomplete="off">
+        <button class="btn btn-primary btn-sm" onclick="addSynRow()">+ 추가</button>
+      </div>
+    </div>
+    <!-- 검색 -->
+    <div class="syn-search-wrap">
+      <input type="text" id="synSearchInp" placeholder="🔍 동의어 검색..." oninput="renderSynTable(this.value)" autocomplete="off">
+    </div>
+    <div class="syn-count" id="synCount"></div>
+    <!-- 테이블 -->
+    <div style="max-height:380px;overflow-y:auto;border-radius:var(--radius);border:1px solid var(--border)">
+      <table class="syn-table">
+        <thead>
+          <tr>
+            <th style="width:42%">입력 키워드</th>
+            <th style="width:42%">변환 태그</th>
+            <th style="width:16%">삭제</th>
+          </tr>
+        </thead>
+        <tbody id="synTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSettingsModal()">닫기</button>
+      <button class="btn btn-warn" onclick="resetSynonyms()">🔄 기본값 복원</button>
+      <button class="btn btn-success" onclick="exportSynonyms()">💾 내보내기</button>
+      <button class="btn btn-primary" onclick="importSynBtn()">📥 가져오기</button>
+      <input type="file" id="synImportInp" style="display:none" accept=".json" onchange="importSynonyms(this.files[0]);this.value=''">
     </div>
   </div>
 </div>
@@ -987,7 +1113,7 @@ function renderReports(list){
 
 // ═══ Search ═══
 let dbt;
-document.getElementById('searchInp').addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applySearch,170);});
+// autocomplete handles search input events
 
 function applySearch(){
   const orig=document.getElementById('searchInp').value.trim(); // ← 원본 케이스 보존
@@ -1600,6 +1726,321 @@ document.addEventListener('keydown',e=>{
 });
 
 // ═══ Init ═══
+
+// ═══ Search Autocomplete ═══
+let acIdx = -1;
+
+function buildAcCandidates() {
+  const freq = {};
+  const display = {};
+  allReports.forEach(r => (r.tags || []).forEach(t => {
+    const norm = normalizeTag(t);
+    if (!norm) return;
+    const key = norm.toLowerCase();
+    if (!display[key]) display[key] = '#' + norm;
+    freq[key] = (freq[key] || 0) + 1;
+  }));
+  // Also include synonym targets not yet in reports
+  Object.values(TAG_SYNONYMS).forEach(v => {
+    const key = v.toLowerCase();
+    if (!display[key]) display[key] = '#' + v;
+  });
+  return { freq, display };
+}
+
+function getSynonymLabel(normLower) {
+  // Find original Korean input that maps to this normalized tag
+  const origKeys = Object.entries(TAG_SYNONYMS)
+    .filter(([k, v]) => v.toLowerCase() === normLower)
+    .map(([k]) => k);
+  return origKeys.length ? origKeys.slice(0, 2).join('/') : '';
+}
+
+function showAc(query) {
+  const list = document.getElementById('acList');
+  if (!query) { list.classList.remove('show'); return; }
+
+  // Extract the last token being typed
+  const tokens = query.split(/\s+/);
+  const lastTok = tokens[tokens.length - 1];
+  if (!lastTok) { list.classList.remove('show'); return; }
+
+  // Normalize what user typed for synonym lookup
+  const rawInput = lastTok.replace(/^#+/, '').trim();
+  const upperInput = rawInput.toUpperCase();
+  const lowerInput = rawInput.toLowerCase();
+
+  const { freq, display } = buildAcCandidates();
+
+  // Score candidates
+  const scored = Object.entries(display).map(([key, tag]) => {
+    const tagLower = key; // already lower
+    const tagDisp = tag.slice(1); // remove #
+    let score = 0;
+    if (tagLower.startsWith(lowerInput)) score = 3;
+    else if (tagLower.includes(lowerInput)) score = 2;
+    else {
+      // Check synonym labels
+      const synLabel = getSynonymLabel(tagLower).toLowerCase();
+      if (synLabel.includes(lowerInput)) score = 1;
+    }
+    // Also check TAG_SYNONYMS forward: if user types Korean → mapped tag
+    const mappedNorm = TAG_SYNONYMS[upperInput];
+    if (mappedNorm && mappedNorm.toLowerCase() === tagLower) score = Math.max(score, 3);
+
+    return { key, tag, score, cnt: freq[key] || 0 };
+  }).filter(x => x.score > 0);
+
+  scored.sort((a, b) => b.score - a.score || b.cnt - a.cnt);
+  const top = scored.slice(0, 12);
+
+  if (!top.length) { list.classList.remove('show'); return; }
+
+  acIdx = -1;
+  list.innerHTML = top.map((item, i) => {
+    const synLabel = getSynonymLabel(item.key);
+    return `<div class="ac-item" data-tag="${esc(item.tag)}" data-idx="${i}"
+      onmousedown="pickAc(event,'${esc(item.tag)}')"
+      onmouseover="acIdx=${i};highlightAc()">
+      <span class="ac-tag">${esc(item.tag)}</span>
+      ${synLabel ? `<span class="ac-orig">${esc(synLabel)}</span>` : ''}
+      ${item.cnt ? `<span class="ac-cnt">${item.cnt}건</span>` : ''}
+    </div>`;
+  }).join('');
+  list.classList.add('show');
+}
+
+function highlightAc() {
+  document.querySelectorAll('.ac-item').forEach((el, i) => {
+    el.classList.toggle('active', i === acIdx);
+  });
+}
+
+function pickAc(e, tag) {
+  e.preventDefault();
+  const inp = document.getElementById('searchInp');
+  const tokens = inp.value.trim().split(/\s+/).filter(Boolean);
+  // Replace last token with selected tag
+  if (tokens.length > 0) tokens[tokens.length - 1] = tag;
+  else tokens.push(tag);
+  inp.value = tokens.join(' ') + ' ';
+  document.getElementById('acList').classList.remove('show');
+  acIdx = -1;
+  applySearch();
+  inp.focus();
+}
+
+function closeAc() {
+  document.getElementById('acList').classList.remove('show');
+  acIdx = -1;
+}
+
+// Attach events to search input
+const searchInp = document.getElementById('searchInp');
+searchInp.addEventListener('input', () => {
+  clearTimeout(dbt);
+  dbt = setTimeout(applySearch, 170);
+  showAc(searchInp.value.trim());
+});
+
+searchInp.addEventListener('keydown', e => {
+  const list = document.getElementById('acList');
+  const items = list.querySelectorAll('.ac-item');
+  if (!list.classList.contains('show')) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIdx = Math.min(acIdx + 1, items.length - 1);
+    highlightAc();
+    items[acIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIdx = Math.max(acIdx - 1, -1);
+    highlightAc();
+    if (acIdx >= 0) items[acIdx]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    if (acIdx >= 0 && items[acIdx]) {
+      e.preventDefault();
+      pickAc(e, items[acIdx].dataset.tag);
+    } else {
+      closeAc();
+    }
+  } else if (e.key === 'Escape') {
+    closeAc();
+  }
+});
+
+searchInp.addEventListener('blur', () => {
+  setTimeout(closeAc, 150);
+});
+
+// Remove old input listener (already handled above, prevent duplicate)
+// Original listener from document.getElementById('searchInp').addEventListener was:
+// document.getElementById('searchInp').addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applySearch,170);});
+// We need to keep applySearch but it's now in our new listener above.
+
+
+
+// ═══ 동의어 설정 모달 ═══
+const DEFAULT_TAG_SYNONYMS = {...TAG_SYNONYMS};
+
+function openSettingsModal() {
+  document.getElementById('synSearchInp').value = '';
+  renderSynTable('');
+  document.getElementById('settingsModal').classList.add('on');
+}
+function closeSettingsModal() {
+  _editingKey = null;
+  document.getElementById('settingsModal').classList.remove('on');
+}
+
+let _editingKey = null;
+
+function renderSynTable(filter) {
+  const q = (filter || '').trim().toUpperCase();
+  const entries = Object.entries(TAG_SYNONYMS).filter(([k, v]) =>
+    !q || k.includes(q) || v.toUpperCase().includes(q)
+  );
+  document.getElementById('synCount').textContent =
+    `총 ${Object.keys(TAG_SYNONYMS).length}개 / 표시 ${entries.length}개`;
+  const tbody = document.getElementById('synTableBody');
+  tbody.innerHTML = entries.sort((a,b)=>a[0].localeCompare(b[0])).map(([k, v]) => {
+    const isEditing = (_editingKey === k);
+    if (isEditing) {
+      return `
+      <tr class="editing" id="syn-row-${esc(k)}">
+        <td>
+          <input class="syn-edit-input" id="synEditKey" value="${esc(k)}"
+            onkeydown="synEditKeydown(event,'${esc(k)}')" placeholder="키워드">
+        </td>
+        <td>
+          <input class="syn-edit-input" id="synEditVal" value="${esc(v)}"
+            onkeydown="synEditKeydown(event,'${esc(k)}')" placeholder="태그명">
+        </td>
+        <td style="white-space:nowrap">
+          <button class="syn-confirm" onclick="confirmEdit('${esc(k)}')" title="저장">✔</button>
+          <button class="syn-cancel" onclick="cancelEdit()" title="취소">✕</button>
+        </td>
+      </tr>`;
+    }
+    return `
+    <tr id="syn-row-${esc(k)}">
+      <td>
+        <div class="syn-cell">
+          <span class="syn-display key">${esc(k)}</span>
+        </div>
+      </td>
+      <td>
+        <div class="syn-cell">
+          <span class="syn-display val">${esc(v)}</span>
+        </div>
+      </td>
+      <td style="white-space:nowrap">
+        <button class="syn-edit-btn" onclick="startEdit('${esc(k)}')" title="수정">✏️</button>
+        <button class="syn-del" onclick="deleteSynRow('${esc(k)}')" title="삭제">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Focus edit inputs if editing
+  if (_editingKey) {
+    const ki = document.getElementById('synEditKey');
+    const vi = document.getElementById('synEditVal');
+    if (ki) { ki.focus(); ki.select(); }
+  }
+}
+
+function startEdit(key) {
+  _editingKey = key;
+  renderSynTable(document.getElementById('synSearchInp').value);
+}
+
+function cancelEdit() {
+  _editingKey = null;
+  renderSynTable(document.getElementById('synSearchInp').value);
+}
+
+function confirmEdit(oldKey) {
+  const newKey = (document.getElementById('synEditKey').value || '').trim().toUpperCase();
+  const newVal = (document.getElementById('synEditVal').value || '').trim();
+  if (!newKey) { showToast('키워드는 비울 수 없습니다', 'w'); return; }
+  if (!newVal) { showToast('태그명은 비울 수 없습니다', 'w'); return; }
+  if (newKey !== oldKey && TAG_SYNONYMS[newKey]) {
+    showToast('이미 존재하는 키워드입니다: ' + newKey, 'w'); return;
+  }
+  if (newKey !== oldKey) delete TAG_SYNONYMS[oldKey];
+  TAG_SYNONYMS[newKey] = newVal;
+  _editingKey = null;
+  renderSynTable(document.getElementById('synSearchInp').value);
+  showToast(`✅ 수정됨: ${newKey} → ${newVal}`, 'ok');
+}
+
+function synEditKeydown(e, key) {
+  if (e.key === 'Enter') confirmEdit(key);
+  else if (e.key === 'Escape') cancelEdit();
+}
+
+function addSynRow() {
+  const k = document.getElementById('synKeyInp').value.trim().toUpperCase();
+  const v = document.getElementById('synValInp').value.trim();
+  if (!k || !v) { showToast('키워드와 태그명을 모두 입력하세요', 'w'); return; }
+  if (TAG_SYNONYMS[k]) { showToast(`이미 존재합니다: ${k} → ${TAG_SYNONYMS[k]}`, 'w'); return; }
+  TAG_SYNONYMS[k] = v;
+  document.getElementById('synKeyInp').value = '';
+  document.getElementById('synValInp').value = '';
+  renderSynTable(document.getElementById('synSearchInp').value);
+  showToast(`✅ 추가됨: ${k} → ${v}`, 'ok');
+}
+
+// updateSynKey/Val replaced by startEdit/confirmEdit
+
+function deleteSynRow(key) {
+  if (!confirm(`"${key}" 동의어를 삭제할까요?`)) return;
+  delete TAG_SYNONYMS[key];
+  renderSynTable(document.getElementById('synSearchInp').value);
+  showToast(`🗑️ 삭제됨: ${key}`, 'ok');
+}
+
+function resetSynonyms() {
+  if (!confirm('모든 동의어를 기본값으로 복원할까요?')) return;
+  Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
+  Object.assign(TAG_SYNONYMS, DEFAULT_TAG_SYNONYMS);
+  renderSynTable(document.getElementById('synSearchInp').value);
+  showToast('🔄 기본값으로 복원됐습니다', 'ok');
+}
+
+function exportSynonyms() {
+  const blob = new Blob([JSON.stringify(TAG_SYNONYMS, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tag_synonyms.json';
+  a.click();
+  showToast('💾 동의어 내보내기 완료', 'ok');
+}
+
+function importSynBtn() {
+  document.getElementById('synImportInp').click();
+}
+
+async function importSynonyms(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (typeof data !== 'object') throw new Error('잘못된 형식');
+    Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
+    Object.assign(TAG_SYNONYMS, data);
+    renderSynTable('');
+    showToast(`✅ ${Object.keys(data).length}개 동의어 가져오기 완료`, 'ok');
+  } catch(e) { showToast('가져오기 실패: ' + e.message, 'err'); }
+}
+
+// Enter key shortcut for add row inputs
+['synKeyInp','synValInp'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addSynRow();
+  });
+});
+
 initDB().then(loadReports);
 </script>
 </body>
