@@ -259,6 +259,13 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
             border:1px solid var(--border);border-radius:8px;padding:7px 10px;
             cursor:pointer;transition:all .15s;}
 .top10-item:hover{border-color:var(--accent);background:var(--accent2);}
+.top10-item.active{
+  border-color:#39ff14;
+  background:rgba(57,255,20,.08);
+  box-shadow:0 0 0 2px rgba(57,255,20,.4), 0 0 10px rgba(57,255,20,.2);
+}
+.top10-item.active .top10-tag{ color:#39ff14; font-weight:700; }
+
 .top10-rank{font-size:.72rem;font-weight:700;min-width:18px;text-align:center;
             color:var(--muted);}
 .top10-rank.gold{color:#FFD700;}
@@ -366,6 +373,32 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 .syn-cancel:hover { background:var(--surface3); color:var(--text); }
 .syn-table td { padding:4px 8px; }
 .syn-table tr.editing td { background:rgba(79,142,247,.06); }
+
+/* ── Confirm Dialog ── */
+.confirm-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.75); z-index:600;
+  align-items:center; justify-content:center;
+}
+.confirm-overlay.on { display:flex; }
+.confirm-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:28px 28px 22px;
+  width:90%; max-width:360px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  text-align:center; animation:confirmIn .18s ease;
+}
+@keyframes confirmIn {
+  from { transform:scale(.92); opacity:0; }
+  to   { transform:scale(1);   opacity:1; }
+}
+.confirm-icon { font-size:2.4rem; margin-bottom:10px; }
+.confirm-title { font-size:.97rem; font-weight:700; margin-bottom:6px; color:var(--text); }
+.confirm-msg { font-size:.83rem; color:var(--muted); line-height:1.6; margin-bottom:20px; }
+.confirm-msg strong { color:var(--danger); font-weight:700; }
+.confirm-btns { display:flex; gap:10px; justify-content:center; }
+.confirm-btns .btn { min-width:90px; justify-content:center; }
+
 </style>
 <!-- PDF.js: PDF 렌더링 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -425,7 +458,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
   <!-- 해시태그 Top 10 -->
   <div class="top10-wrap" id="top10Wrap" style="display:none">
     <div class="top10-header" onclick="toggleTop10()">
-      <h3>🏷️ 해시태그 Top 10</h3>
+      <h3>🏷️ 해시태그 순위</h3>
       <span class="top10-toggle" id="top10Arrow">▲</span>
     </div>
     <div id="top10Body" class="top10-body"></div>
@@ -587,6 +620,19 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
       <button class="btn btn-success" onclick="exportSynonyms()">💾 내보내기</button>
       <button class="btn btn-primary" onclick="importSynBtn()">📥 가져오기</button>
       <input type="file" id="synImportInp" style="display:none" accept=".json" onchange="importSynonyms(this.files[0]);this.value=''">
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONFIRM DIALOG ═══ -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon" id="confirmIcon">⚠️</div>
+    <div class="confirm-title" id="confirmTitle">삭제하시겠습니까?</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="btn btn-ghost" id="confirmCancelBtn">아니오</button>
+      <button class="btn btn-danger" id="confirmOkBtn">예 [삭제]</button>
     </div>
   </div>
 </div>
@@ -1172,6 +1218,7 @@ if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
     (r.tags||[]).some(g=>g.toLowerCase().includes(t)||normalizeTag(g)===normT);
   }));
   renderReports(f);
+renderTop10();
 }
 function renderActiveFilters(tf,xt){
   const c=document.getElementById('activeFilters');
@@ -1417,13 +1464,22 @@ function renderTop10(){
   if(!sorted.length){wrap.style.display='none';return;}
   wrap.style.display='block';
 
-  const maxCnt=sorted[0][1];
-  const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+const maxCnt=sorted[0][1];
+const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
 
-  body.innerHTML=sorted.map(([key,cnt],i)=>{
-    const tag=display[key]||key;
-    return `
-    <div class="top10-item" onclick="filterByTag('${esc(tag)}')">
+// 현재 검색창 활성 태그 추출
+const _searchVal=document.getElementById('searchInp').value.trim().toLowerCase();
+const activeTags=new Set();
+const _re=/#\S+/g; let _m;
+while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim());
+
+body.innerHTML=sorted.map(([key,cnt],i)=>{
+  const tag=display[key]||key;
+  const isActive = activeTags.has(tag.toLowerCase());
+  return `
+  <div class="top10-item ${isActive ? 'active' : ''}" onclick="filterByTag('${esc(tag)}')">
+
+
       <span class="top10-rank ${rankClass(i)}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
@@ -1655,8 +1711,23 @@ async function reqAndPreview(id){
 function closeDtModal(){document.getElementById('dtModal').classList.remove('on');}
 
 async function delReport(id){
-  if(!confirm('삭제하시겠습니까?\n파일 원본은 삭제되지 않습니다.'))return;
-  await dbDel(id); closeDtModal(); await loadReports(); showToast('🗑️ 삭제됐습니다','ok');
+  const r = await dbGet(id);
+  const fname = r ? r.filename : '';
+  const dateStr = r && r.date ? fmtDate(r.date) : '날짜 미지정';
+  showConfirm({
+    icon: '🗑️',
+    title: '보고서를 삭제할까요?',
+    msg: `<strong>${fname}</strong>
+          <br><span style="color:var(--accent)">${dateStr}</span>
+          <br>보고서 정보가 삭제됩니다.
+          <br>파일 원본은 삭제되지 않습니다.`,
+    okLabel: '예, 삭제',
+    okClass: 'btn-danger',
+    onOk: async () => {
+      await dbDel(id); closeDtModal(); await loadReports();
+      showToast('🗑️ 삭제됐습니다', 'ok');
+    }
+  });
 }
 
 function tagSearch(tag){
@@ -2023,20 +2094,39 @@ function addSynRow() {
 // updateSynKey/Val replaced by startEdit/confirmEdit
 
 function deleteSynRow(key) {
-  if (!confirm(`"${key}" 동의어를 삭제할까요?`)) return;
-  delete TAG_SYNONYMS[key];
-  saveSynonymsToStorage();
-  renderSynTable(document.getElementById('synSearchInp').value);
-  showToast(`🗑️ 삭제됨: ${key}`, 'ok');
+  const val = TAG_SYNONYMS[key] || '';
+  showConfirm({
+    icon: '🗑️',
+    title: '동의어를 삭제할까요?',
+    msg: `<strong>${esc(key)}</strong> → <strong style="color:var(--tag-text)">${esc(val)}</strong>
+          <br><span style="font-size:.78rem;color:var(--muted);margin-top:4px;display:block">
+          삭제 후에는 되돌릴 수 없습니다.</span>`,
+    okLabel: '예, 삭제',
+    okClass: 'btn-danger',
+    onOk: () => {
+      delete TAG_SYNONYMS[key];
+      saveSynonymsToStorage();
+      renderSynTable(document.getElementById('synSearchInp').value);
+      showToast(`🗑️ 삭제됨: ${key}`, 'ok');
+    }
+  });
 }
 
 function resetSynonyms() {
-  if (!confirm('모든 동의어를 기본값으로 복원할까요?')) return;
-  Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
-  Object.assign(TAG_SYNONYMS, DEFAULT_TAG_SYNONYMS);
-  saveSynonymsToStorage();
-  renderSynTable(document.getElementById('synSearchInp').value);
-  showToast('🔄 기본값으로 복원됐습니다', 'ok');
+  showConfirm({
+    icon: '🔄',
+    title: '기본값으로 복원할까요?',
+    msg: `현재 추가/수정한 동의어가 모두 사라지고<br>코드 기본값으로 되돌아갑니다.`,
+    okLabel: '예, 복원',
+    okClass: 'btn-warn',
+    onOk: () => {
+      Object.keys(TAG_SYNONYMS).forEach(k => delete TAG_SYNONYMS[k]);
+      Object.assign(TAG_SYNONYMS, DEFAULT_TAG_SYNONYMS);
+      saveSynonymsToStorage();
+      renderSynTable(document.getElementById('synSearchInp').value);
+      showToast('🔄 기본값으로 복원됐습니다', 'ok');
+    }
+  });
 }
 
 function exportSynonyms() {
@@ -2072,6 +2162,25 @@ async function importSynonyms(file) {
     if (e.key === 'Enter') addSynRow();
   });
 });
+
+// ═══ 커스텀 확인 다이얼로그 ═══
+function showConfirm({ icon='⚠️', title='확인', msg='', okLabel='예, 삭제', okClass='btn-danger', onOk }) {
+  document.getElementById('confirmIcon').textContent = icon;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').innerHTML = msg;
+  const okBtn = document.getElementById('confirmOkBtn');
+  const cancelBtn = document.getElementById('confirmCancelBtn');
+  okBtn.textContent = okLabel;
+  okBtn.className = 'btn ' + okClass;
+  const overlay = document.getElementById('confirmOverlay');
+  overlay.classList.add('on');
+
+  const close = () => overlay.classList.remove('on');
+  okBtn.onclick = () => { close(); onOk(); };
+  cancelBtn.onclick = close;
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+}
+
 
 initDB().then(loadReports);
 </script>
