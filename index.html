@@ -111,13 +111,13 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
                -webkit-box-orient:vertical; overflow:hidden; line-height:1.6; }
 .report-tags { display:flex; flex-wrap:wrap; gap:4px; }
 .report-tag { background:var(--tag-bg); color:var(--tag-text);
-              padding:2px 8px; border-radius:12px; font-size:.74rem;
-              transition:all .15s; }
-.report-tag.active {
-  background:rgba(57,255,20,.12);
+              padding:2px 8px; border-radius:12px; font-size:.74rem; }
+.search-hit { color:#39ff14; font-weight:800; }
+.report-tag.search-hit-tag {
   color:#39ff14;
-  font-weight:700;
-  box-shadow:0 0 0 1px rgba(57,255,20,.5);
+  border:1px solid rgba(57,255,20,.45);
+  background:rgba(57,255,20,.1);
+  box-shadow:0 0 0 1px rgba(57,255,20,.15);
 }
 
 /* ── Queue bar ── */
@@ -702,6 +702,13 @@ dz.addEventListener('drop',e=>{
 // ═══ Date Extraction ═══
 function extractDate(name){
   let m;
+  // Korean date formats: YYYY년M월D일 / YY년M월D일
+  m=name.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if(m&&+m[1]>=2000&&+m[1]<=2099&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31)
+    return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  m=name.match(/(?:^|[^0-9])(\d{2})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if(m&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31)
+    return `20${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
   // YYYY-MM-DD / YYYY_MM_DD / YYYY.MM.DD
   m=name.match(/(\d{4})[-_.](\d{2})[-_.](\d{2})/);
   if(m&&+m[1]>=2000&&+m[1]<=2099&&+m[2]>=1&&+m[2]<=12&&+m[3]>=1&&+m[3]<=31)
@@ -1174,7 +1181,26 @@ function updateStats(){
   document.getElementById('statsBar').style.display=n>0?'flex':'none';
   renderTop10();
 }
-function renderReports(list){
+function escReg(s){return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+function highlightText(s, terms){
+  let html=esc(s||'');
+  const uniq=[...new Set((terms||[]).map(t=>String(t||'').trim()).filter(Boolean))].sort((a,b)=>b.length-a.length);
+  uniq.forEach(t=>{
+    html=html.replace(new RegExp(escReg(esc(t)),'gi'), '<span class="search-hit">$&</span>');
+  });
+  return html;
+}
+function isTagHit(tag, tagFilters, textTerms){
+  const raw=String(tag||'');
+  const low=raw.toLowerCase();
+  const norm=normalizeTag(raw).toLowerCase();
+  if((tagFilters||[]).some(t=>normalizeTag(String(t).replace(/^#/,'')).toLowerCase()===norm)) return true;
+  return (textTerms||[]).some(t=>{
+    const term=String(t||'').toLowerCase();
+    return term && (low.includes(term)||normalizeTag(term).toLowerCase()===norm);
+  });
+}
+function renderReports(list, searchCtx={tagFilters:[], textTerms:[]}){
   const grid=document.getElementById('reportsGrid');
   const empty=document.getElementById('emptyState');
   if(!list.length){grid.innerHTML='';empty.style.display='block';return;}
@@ -1185,19 +1211,9 @@ function renderReports(list){
         <span class="report-date">${fmtDate(r.date)}</span>
         <span style="font-size:1.2rem">${fileIcon(r.filename)}</span>
       </div>
-      <div class="report-name" title="${esc(r.filename)}">${esc(r.filename)}</div>
-      <div class="report-memo">${r.memo?esc(r.memo):'<span style="color:var(--muted);font-style:italic">메모 없음</span>'}</div>
-      <div class="report-tags">${(()=>{
-  const _sv=document.getElementById('searchInp').value.trim().toLowerCase();
-  const _at=new Set();
-  const _re=/#[^#]+/g; let _rm;
-  while((_rm=_re.exec(_sv))!==null) _at.add(_rm[0].trim().replace(/\s+$/,''));
-  return r.tags.map(t=>{
-    const _tl=t.toLowerCase();
-    const _act=_at.has(_tl)||Array.from(_at).some(a=>a===_tl);
-    return `<span class="report-tag${_act?' active':''}">${esc(t)}</span>`;
-  }).join('');
-})()}</div>
+      <div class="report-name" title="${esc(r.filename)}">${highlightText(r.filename, searchCtx.textTerms)}</div>
+      <div class="report-memo">${r.memo?highlightText(r.memo, searchCtx.textTerms):'<span style="color:var(--muted);font-style:italic">메모 없음</span>'}</div>
+      <div class="report-tags">${r.tags.map(t=>`<span class="report-tag ${isTagHit(t, searchCtx.tagFilters, searchCtx.textTerms)?'search-hit-tag':''}">${highlightText(t, searchCtx.textTerms)}</span>`).join('')}</div>
     </div>`).join('');
 }
 
@@ -1234,7 +1250,7 @@ if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
     (r.memo&&r.memo.toLowerCase().includes(t))||
     (r.tags||[]).some(g=>g.toLowerCase().includes(t)||normalizeTag(g)===normT);
   }));
-  renderReports(f);
+  renderReports(f,{tagFilters:tf,textTerms:xt});
 renderTop10();
 }
 function renderActiveFilters(tf,xt){
@@ -1488,7 +1504,7 @@ const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
 const _searchVal=document.getElementById('searchInp').value.trim().toLowerCase();
 const activeTags=new Set();
 const _re=/#[^#]+/g; let _m;
-while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim().replace(/\s+$/,""));
+while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim());
 
 body.innerHTML=sorted.map(([key,cnt],i)=>{
   const tag=display[key]||key;
@@ -1511,29 +1527,28 @@ body.innerHTML=sorted.map(([key,cnt],i)=>{
   }).join('');
 }
 
-function filterByTag(tag){
-  const inp=document.getElementById('searchInp');
-  const orig=inp.value.trim();
-  const toks=[];
-  const re=/#[^#]*/g; let last=0, m;
-  while((m=re.exec(orig))!==null){
-    const plain=orig.slice(last,m.index).trim();
-    if(plain) plain.split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+function filterByTag(tag) {
+  const inp = document.getElementById('searchInp');
+  const orig = inp.value.trim(); // ← toLowerCase() 제거, 원본 케이스 보존
+  const toks = [];
+  const reg = /#[^#]*/g;
+  let last = 0, m;
+  while ((m = reg.exec(orig)) !== null) {
+    const plain = orig.slice(last, m.index).trim();
+    if (plain) plain.split(/\s+/).filter(Boolean).forEach(w => toks.push(w));
     toks.push(m[0].trim());
-    last=m.index+m[0].length;
+    last = m.index + m[0].length;
   }
-  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w=>toks.push(w));
+  orig.slice(last).trim().split(/\s+/).filter(Boolean).forEach(w => toks.push(w));
 
-  const already=toks.some(t=>t.toLowerCase()===tag.toLowerCase());
-  if(already){
-    // 이미 선택된 태그 → 제거 (토글 OFF)
-    inp.value=toks.filter(t=>t.toLowerCase()!==tag.toLowerCase()).join(' ');
-  } else {
-    // 없는 태그 → 추가 (토글 ON)
-    inp.value=(inp.value.trim() ? inp.value.trim()+' ' : '')+tag;
+  const already = toks.some(t => t.toLowerCase() === tag.toLowerCase()); // 비교만 소문자
+  if (already) { // OFF
+    inp.value = toks.filter(t => t.toLowerCase() !== tag.toLowerCase()).join(' ');
+  } else { // ON
+    inp.value = (inp.value.trim() ? inp.value.trim() + ' ' : '') + tag;
   }
   applySearch();
-  document.querySelector('.search-wrap').scrollIntoView({behavior:'smooth',block:'center'});
+  document.querySelector('.search-wrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 
