@@ -101,9 +101,18 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
                cursor:pointer; transition:all .2s; }
 .report-card:hover { border-color:var(--accent); transform:translateY(-2px);
                      box-shadow:0 6px 24px rgba(79,142,247,.12); }
-.card-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+.card-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+.card-top-left,.card-top-right { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.card-top-right { justify-content:flex-end; }
 .report-date { font-size:.74rem; color:var(--accent); font-weight:700;
                background:var(--accent2); padding:3px 8px; border-radius:6px; }
+.storage-badge { font-size:.68rem; font-weight:800; padding:3px 7px; border-radius:999px;
+                 border:1px solid var(--border); white-space:nowrap; }
+.storage-badge.link { color:var(--accent); background:rgba(79,142,247,.12);
+                      border-color:rgba(79,142,247,.35); }
+.storage-badge.copy { color:var(--success); background:rgba(52,211,153,.1);
+                      border-color:rgba(52,211,153,.38); }
+.storage-badge.none { color:var(--muted); background:var(--surface2); }
 .report-name { font-size:.79rem; color:var(--muted); margin-bottom:7px;
                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .report-memo { font-size:.82rem; color:var(--text); margin-bottom:10px;
@@ -1200,21 +1209,34 @@ function isTagHit(tag, tagFilters, textTerms){
     return term && (low.includes(term)||normalizeTag(term).toLowerCase()===norm);
   });
 }
+function storageStatus(r){
+  if(r.fileData) return {cls:'copy', label:'내부 보관'};
+  if(r.fileHandle) return {cls:'link', label:'경로 연결'};
+  return {cls:'none', label:'파일 없음'};
+}
 function renderReports(list, searchCtx={tagFilters:[], textTerms:[]}){
   const grid=document.getElementById('reportsGrid');
   const empty=document.getElementById('emptyState');
   if(!list.length){grid.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-  grid.innerHTML=list.map(r=>`
+  grid.innerHTML=list.map(r=>{
+    const st=storageStatus(r);
+    return `
     <div class="report-card" onclick="openDetail(${r.id})">
       <div class="card-top">
-        <span class="report-date">${fmtDate(r.date)}</span>
-        <span style="font-size:1.2rem">${fileIcon(r.filename)}</span>
+        <div class="card-top-left">
+          <span class="report-date">${fmtDate(r.date)}</span>
+          <span class="storage-badge ${st.cls}">${st.label}</span>
+        </div>
+        <div class="card-top-right">
+          <span style="font-size:1.2rem">${fileIcon(r.filename)}</span>
+        </div>
       </div>
       <div class="report-name" title="${esc(r.filename)}">${highlightText(r.filename, searchCtx.textTerms)}</div>
       <div class="report-memo">${r.memo?highlightText(r.memo, searchCtx.textTerms):'<span style="color:var(--muted);font-style:italic">메모 없음</span>'}</div>
       <div class="report-tags">${r.tags.map(t=>`<span class="report-tag ${isTagHit(t, searchCtx.tagFilters, searchCtx.textTerms)?'search-hit-tag':''}">${highlightText(t, searchCtx.textTerms)}</span>`).join('')}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ═══ Search ═══
