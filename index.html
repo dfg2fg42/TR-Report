@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>👨‍🔧 비정상 상황 보고서 관리</title>
+<title>비정상 상황 보고서 관리 · 파일 포함 백업</title>
 <style>
 :root {
   --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --surface3:#2a2f45;
@@ -447,7 +447,7 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
     <div class="panel-actions">
       <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택 (경로 직접)</button>
       <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
-      <button class="btn btn-success" onclick="exportData()">💾 백업 (JSON)</button>
+      <button class="btn btn-success" onclick="exportData()">💾 파일 포함 백업 (JSON)</button>
       <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (JSON)</button>
       <input type="file" id="importInput" style="display:none" accept=".json"
              onchange="importData(this.files[0]);this.value=''">
@@ -458,6 +458,14 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 
 <!-- ═══ MAIN ═══ -->
 <div class="container">
+  <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;font-size:.83rem;line-height:1.8">
+    <strong>파일 포함 백업 버전</strong><br>
+    경로로 연결한 원본도 읽어 실제 PDF·문서 내용을 JSON에 함께 저장합니다.
+    백업 파일을 보고서 관리(test)의 복원에서 선택하면 원본 경로 연결 없이 사용할 수 있습니다.<br>
+    백업 시 원본 접근을 허용하고 <strong>파일 미포함 0건</strong>인지 확인하세요.
+    파일이 이동되었거나 연결 정보가 없다면 해당 보고서의 수정 → 파일 교체로 원본을 선택하고 저장한 뒤 백업하세요.
+    <div id="backupStatus" role="status" style="margin-top:10px;overflow-wrap:anywhere"></div>
+  </section>
   <div class="browser-warn" id="bwarn">
     ⚠️ 파일 경로 직접 접근은 <strong>Chrome / Edge</strong>에서만 지원됩니다.
     현재 브라우저에서는 파일 업로드 방식을 사용해 주세요.
@@ -673,7 +681,9 @@ function initDB(){
 }
 const dbo=(mode,fn)=>new Promise((res,rej)=>{
   const tx=db.transaction(ST,mode),s=tx.objectStore(ST),r=fn(s);
-  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  tx.oncomplete=()=>res(r.result);
+  tx.onabort=()=>rej(tx.error||r.error||new Error('저장이 취소됐습니다'));
+  tx.onerror=()=>rej(tx.error||r.error);
 });
 const dbAdd=d=>dbo('readwrite',s=>s.add(d));
 const dbPut=d=>dbo('readwrite',s=>s.put(d));
@@ -1799,29 +1809,80 @@ function tagSearch(tag){
 
 
 // ═══ Export / Import (백업 & 복원) ═══
-async function exportData(){
-  const data=await dbAll();
-  const exportable=data.map(r=>{
+let backupInProgress=false;
+function showBackupStatus(message,missing=[]){
+  let status=document.getElementById('backupStatus');
+  if(!status){
+    status=document.createElement('div');status.id='backupStatus';
+    status.style.cssText='font-size:.75rem;line-height:1.7;margin-top:12px;overflow-wrap:anywhere';
+    status.setAttribute('role','status');
+    document.querySelector('.container').prepend(status);
+  }
+  status.textContent=message;
+  if(missing.length){
+    const details=document.createElement('details');
+    const summary=document.createElement('summary');summary.textContent='파일 미포함 목록 ('+missing.length+'건)';
+    details.appendChild(summary);
+    const list=document.createElement('ul');list.style.cssText='padding-left:18px;max-height:220px;overflow:auto';
+    for(const item of missing){const li=document.createElement('li');li.textContent=item.filename+' — '+item.reason;list.appendChild(li);}
+    details.appendChild(list);status.appendChild(details);
+  }
+}
+async function buildReportBackup(data,onProgress=()=>{}){
+  const exportable=[],missing=[];
+  let included=0;
+  for(const [index,r] of data.entries()){
+    onProgress(index+1,data.length);
     const obj={
       filename:r.filename, fileSize:r.fileSize||0, fileType:r.fileType||'',
-      date:r.date||'', tags:r.tags||[], memo:r.memo||'', createdAt:r.createdAt||''
+      date:r.date||'', tags:r.tags||[], memo:r.memo||'', operation:r.operation||null, createdAt:r.createdAt||''
     };
-    if(r.fileData){
-      const bytes=new Uint8Array(r.fileData);
-      let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
-      obj.fileDataB64=btoa(bin);
+    try{
+      // 사본이 없으면 원본 핸들에서 파일을 읽어 백업에 함께 넣습니다.
+      const blob=await getFileBlob(r);
+      const dataUrl=await blobToDataURL(blob);
+      obj.fileDataB64=dataUrl.slice(dataUrl.indexOf(',')+1);
+      obj.fileSize=blob.size;
+      obj.fileType=blob.type||r.fileType||getMime(r.filename);
+      included++;
+    }catch(e){
+      const reason=!r.fileData&&!r.fileHandle?'저장된 파일과 원본 연결 없음'
+        :e.name==='NotFoundError'?'원본 파일이 이동되거나 삭제됨'
+        :e.name==='NotAllowedError'||e.name==='SecurityError'||e.message==='권한 거부'?'원본 접근 권한 없음 — 파일을 다시 연결한 뒤 재백업하세요'
+        :'파일 읽기 실패: '+(e.message||String(e));
+      obj.fileBackupError=reason;
+      missing.push({filename:r.filename,reason});
     }
-    return obj;
-  });
-  const json=JSON.stringify({version:1,exportedAt:new Date().toISOString(),reports:exportable},null,2);
-  const blob=new Blob([json],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  const d=new Date().toISOString().slice(0,10).replace(/-/g,'');
-  a.href=url; a.download=`troubleshoot_backup_${d}.json`; a.style.display='none';
-  document.body.appendChild(a); a.click();
-  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},500);
-  showToast(`✅ ${exportable.length}건 백업 완료`,'ok');
+    exportable.push(obj);
+  }
+  return {version:2,exportedAt:new Date().toISOString(),filesIncluded:included,filesMissing:missing,reports:exportable};
+}
+async function exportData(){
+  if(backupInProgress) return;
+  backupInProgress=true;
+  const buttons=[...document.querySelectorAll('button[onclick="exportData()"]')];
+  buttons.forEach(b=>b.disabled=true);
+  try{
+    showBackupStatus('백업 준비 중… 원본 파일의 접근 요청이 뜨면 허용해 주세요.');
+    const data=await dbAll();
+    const backup=await buildReportBackup(data,(current,total)=>showBackupStatus(`파일 포함 백업 중… ${current} / ${total}건`));
+    const json=JSON.stringify(backup,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const d=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    a.href=url; a.download=`troubleshoot_backup_${d}${backup.filesMissing.length?'_파일일부미포함':''}.json`; a.style.display='none';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},1000);
+    const message=`보고서 ${data.length}건 · 파일 포함 ${backup.filesIncluded}건 · 파일 미포함 ${backup.filesMissing.length}건`;
+    showBackupStatus(message+(backup.filesMissing.length?' — 보고서 정보만 저장된 항목이 있습니다. 원본 재연결 후 다시 백업하세요.':''),backup.filesMissing);
+    showToast((backup.filesMissing.length?'⚠️ ':'✅ ')+message,backup.filesMissing.length?'w':'ok');
+  }catch(e){
+    showBackupStatus('백업 실패: '+e.message);
+    showToast('❌ 백업 실패: '+e.message,'err');
+  }finally{
+    backupInProgress=false;buttons.forEach(b=>b.disabled=false);
+  }
 }
 
 async function importData(file){
@@ -1834,7 +1895,7 @@ async function importData(file){
     let count=0;
     for(const r of reports){
       let fileData=null;
-      if(r.fileDataB64){
+      if(typeof r.fileDataB64==='string'){
         const bin=atob(r.fileDataB64);
         const bytes=new Uint8Array(bin.length);
         for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
