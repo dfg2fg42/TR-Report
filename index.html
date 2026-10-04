@@ -447,9 +447,9 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
     <div class="panel-actions">
       <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택 (경로 직접)</button>
       <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
-      <button class="btn btn-success" onclick="exportData()">💾 파일 포함 백업 (JSON)</button>
-      <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (JSON)</button>
-      <input type="file" id="importInput" style="display:none" accept=".json"
+      <button class="btn btn-success" onclick="exportData()">💾 파일 포함 백업</button>
+      <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (백업/JSON)</button>
+      <input type="file" id="importInput" style="display:none" accept=".reportbackup,.json"
              onchange="importData(this.files[0]);this.value=''">
       <button class="btn btn-ghost" onclick="togglePanel()">✕ 닫기</button>
     </div>
@@ -460,8 +460,8 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 <div class="container">
   <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;font-size:.83rem;line-height:1.8">
     <strong>파일 포함 백업 버전</strong><br>
-    경로로 연결한 원본도 읽어 실제 PDF·문서 내용을 JSON에 함께 저장합니다.
-    백업 파일을 보고서 관리(test)의 복원에서 선택하면 원본 경로 연결 없이 사용할 수 있습니다.<br>
+    경로로 연결한 원본도 읽어 실제 PDF·문서 내용을 대용량 백업 파일(.reportbackup)에 함께 저장합니다.
+    백업 파일(.reportbackup)을 보고서 관리(test)의 복원에서 선택하면 원본 경로 연결 없이 사용할 수 있습니다.<br>
     백업 시 원본 접근을 허용하고 <strong>파일 미포함 0건</strong>인지 확인하세요.
     파일이 이동되었거나 연결 정보가 없다면 해당 보고서의 수정 → 파일 교체로 원본을 선택하고 저장한 뒤 백업하세요.
     <div id="backupStatus" role="status" style="margin-top:10px;overflow-wrap:anywhere"></div>
@@ -1828,64 +1828,140 @@ function showBackupStatus(message,missing=[]){
     details.appendChild(list);status.appendChild(details);
   }
 }
-async function buildReportBackup(data,onProgress=()=>{}){
-  const exportable=[],missing=[];
-  let included=0;
-  for(const [index,r] of data.entries()){
-    onProgress(index+1,data.length);
-    const obj={
-      filename:r.filename, fileSize:r.fileSize||0, fileType:r.fileType||'',
-      date:r.date||'', tags:r.tags||[], memo:r.memo||'', operation:r.operation||null, createdAt:r.createdAt||''
-    };
-    try{
-      // 사본이 없으면 원본 핸들에서 파일을 읽어 백업에 함께 넣습니다.
-      const blob=await getFileBlob(r);
-      const dataUrl=await blobToDataURL(blob);
-      obj.fileDataB64=dataUrl.slice(dataUrl.indexOf(',')+1);
-      obj.fileSize=blob.size;
-      obj.fileType=blob.type||r.fileType||getMime(r.filename);
-      included++;
-    }catch(e){
-      const reason=!r.fileData&&!r.fileHandle?'저장된 파일과 원본 연결 없음'
+// Version 3: bounded JSON lines in one .reportbackup file.
+// PDF bytes are encoded in 3 MiB chunks; no whole-backup JSON string is created.
+const REPORT_BACKUP_CHUNK=3*1024*1024;
+const REPORT_BACKUP_FORMAT='troubleshoot-report-backup';
+async function* storedBackupReports(){
+  const keys=await dbo('readonly',s=>s.getAllKeys());
+  for(const key of keys){const report=await dbGet(key);if(report) yield report;}
+}
+async function buildPortableBackup(reports,onProgress=()=>{}){
+  const parts=[],missing=[];
+  let total=0,included=0;
+  const append=value=>parts.push(new Blob([JSON.stringify(value)+'\n'],{type:'application/octet-stream'}));
+  append({type:'header',format:REPORT_BACKUP_FORMAT,version:3,exportedAt:new Date().toISOString(),chunkBytes:REPORT_BACKUP_CHUNK});
+  for await(const r of reports){
+    total++;
+    const metadata={filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:r.tags||[],memo:r.memo||'',operation:r.operation||null,createdAt:r.createdAt||''};
+    let blob=null,reason='';
+    try{blob=await getFileBlob(r);}
+    catch(e){
+      reason=!r.fileData&&!r.fileHandle?'저장된 파일과 원본 연결 없음'
         :e.name==='NotFoundError'?'원본 파일이 이동되거나 삭제됨'
-        :e.name==='NotAllowedError'||e.name==='SecurityError'||e.message==='권한 거부'?'원본 접근 권한 없음 — 파일을 다시 연결한 뒤 재백업하세요'
+        :e.name==='NotAllowedError'||e.name==='SecurityError'||e.message==='권한 거부'?'원본 접근 권한 없음 — 파일 재연결 후 다시 백업하세요'
         :'파일 읽기 실패: '+(e.message||String(e));
-      obj.fileBackupError=reason;
       missing.push({filename:r.filename,reason});
     }
-    exportable.push(obj);
+    if(blob){metadata.fileSize=blob.size;metadata.fileType=blob.type||getMime(r.filename);}
+    append({type:'report',metadata,hasFile:!!blob,fileBackupError:reason});
+    let chunks=0;
+    if(blob){
+      for(let offset=0;offset<blob.size;offset+=REPORT_BACKUP_CHUNK){
+        onProgress(total,r.filename,offset,blob.size);
+        const dataUrl=await blobToDataURL(blob.slice(offset,offset+REPORT_BACKUP_CHUNK));
+        append({type:'chunk',index:chunks++,data:dataUrl.slice(dataUrl.indexOf(',')+1)});
+      }
+      included++;
+    }
+    append({type:'end',chunks});
+    onProgress(total,r.filename,blob?blob.size:0,blob?blob.size:0);
   }
-  return {version:2,exportedAt:new Date().toISOString(),filesIncluded:included,filesMissing:missing,reports:exportable};
+  append({type:'footer',reports:total,filesIncluded:included,filesMissing:missing.length});
+  return {blob:new Blob(parts,{type:'application/octet-stream'}),reports:total,filesIncluded:included,filesMissing:missing};
 }
 async function exportData(){
-  if(backupInProgress) return;
+  if(backupInProgress||restoreInProgress){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
   backupInProgress=true;
   const buttons=[...document.querySelectorAll('button[onclick="exportData()"]')];
   buttons.forEach(b=>b.disabled=true);
   try{
-    showBackupStatus('백업 준비 중… 원본 파일의 접근 요청이 뜨면 허용해 주세요.');
-    const data=await dbAll();
-    const backup=await buildReportBackup(data,(current,total)=>showBackupStatus(`파일 포함 백업 중… ${current} / ${total}건`));
-    const json=JSON.stringify(backup,null,2);
-    const blob=new Blob([json],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    const d=new Date().toISOString().slice(0,10).replace(/-/g,'');
-    a.href=url; a.download=`troubleshoot_backup_${d}${backup.filesMissing.length?'_파일일부미포함':''}.json`; a.style.display='none';
-    document.body.appendChild(a); a.click();
-    setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},1000);
-    const message=`보고서 ${data.length}건 · 파일 포함 ${backup.filesIncluded}건 · 파일 미포함 ${backup.filesMissing.length}건`;
-    showBackupStatus(message+(backup.filesMissing.length?' — 보고서 정보만 저장된 항목이 있습니다. 원본 재연결 후 다시 백업하세요.':''),backup.filesMissing);
+    showBackupStatus('파일 포함 백업 준비 중… 원본 접근 요청이 뜨면 허용해 주세요.');
+    const backup=await buildPortableBackup(storedBackupReports(),(current,name,done,size)=>{
+      showBackupStatus(`${current}번째 보고서 백업 중 · ${name} (${Math.round(done/1024/1024)} / ${Math.ceil(size/1024/1024)} MB)`);
+    });
+    const url=URL.createObjectURL(backup.blob),a=document.createElement('a');
+    const date=new Date().toISOString().slice(0,10).replace(/-/g,'');
+    a.href=url;a.download=`troubleshoot_backup_${date}${backup.filesMissing.length?'_파일일부미포함':''}.reportbackup`;
+    a.style.display='none';document.body.appendChild(a);a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},60000);
+    const message=`보고서 ${backup.reports}건 · 파일 포함 ${backup.filesIncluded}건 · 파일 미포함 ${backup.filesMissing.length}건`;
+    showBackupStatus(message+(backup.filesMissing.length?' — 원본 재연결 후 다시 백업하세요.':''),backup.filesMissing);
     showToast((backup.filesMissing.length?'⚠️ ':'✅ ')+message,backup.filesMissing.length?'w':'ok');
+  }catch(e){showBackupStatus('백업 실패: '+e.message);showToast('❌ 백업 실패: '+e.message,'err');}
+  finally{backupInProgress=false;buttons.forEach(b=>b.disabled=false);}
+}
+async function* backupLines(file){
+  // Blob slices keep string allocations bounded even on file:// and older browsers.
+  const decoder=new TextDecoder('utf-8',{fatal:true});
+  let pending='';
+  for(let offset=0;offset<file.size;offset+=256*1024){
+    pending+=decoder.decode(await file.slice(offset,offset+256*1024).arrayBuffer(),{stream:true});
+    let end;
+    while((end=pending.indexOf('\n'))>=0){
+      const line=pending.slice(0,end);pending=pending.slice(end+1);
+      if(line.trim())yield line;
+    }
+    if(pending.length>8*1024*1024)throw new Error('백업 항목이 허용 크기를 초과했습니다');
+  }
+  pending+=decoder.decode();if(pending.trim())yield pending;
+}
+async function restorePortableBackup(file,onProgress=()=>{}){
+  let header=false,footer=false,current=null,count=0,withFile=0;
+  const missing=[];
+  try{
+    for await(const line of backupLines(file)){
+      const item=JSON.parse(line);
+      if(!header){
+        if(item.type!=='header'||item.format!==REPORT_BACKUP_FORMAT||item.version!==3)throw new Error('지원하지 않는 백업 형식입니다');
+        header=true;continue;
+      }
+      if(footer)throw new Error('백업 끝부분 이후에 잘못된 데이터가 있습니다');
+      if(item.type==='report'){
+        if(current||!item.metadata||typeof item.metadata.filename!=='string'||typeof item.hasFile!=='boolean')throw new Error('보고서 정보가 잘못됐습니다');
+        current={metadata:item.metadata,hasFile:item.hasFile,reason:item.fileBackupError,parts:[],size:0};
+      }else if(item.type==='chunk'){
+        if(!current||!current.hasFile||item.index!==current.parts.length||typeof item.data!=='string'||item.data.length>4*REPORT_BACKUP_CHUNK/3)throw new Error('파일 조각 순서 또는 크기가 잘못됐습니다');
+        const bin=atob(item.data),bytes=new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+        current.parts.push(new Blob([bytes]));current.size+=bytes.length;
+      }else if(item.type==='end'){
+        if(!current||item.chunks!==current.parts.length||current.hasFile&&current.size!==current.metadata.fileSize)throw new Error('파일 내용이 누락되거나 손상됐습니다');
+        const r=current.metadata;
+        await dbAdd({fileHandle:null,fileData:current.hasFile?new Blob(current.parts,{type:r.fileType||getMime(r.filename)}):null,filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:Array.isArray(r.tags)?r.tags:[],memo:r.memo||'',operation:typeof validOperation==='function'?validOperation(r.operation):r.operation||null,createdAt:r.createdAt||new Date().toISOString()});
+        count++;if(current.hasFile)withFile++;else missing.push({filename:r.filename,reason:current.reason||'백업에 파일 내용 없음 — 원본 재연결 필요'});
+        current=null;onProgress(count);
+      }else if(item.type==='footer'){
+        if(current||item.reports!==count||item.filesIncluded!==withFile||item.filesMissing!==missing.length)throw new Error('백업 완료 정보가 맞지 않습니다');
+        footer=true;
+      }else throw new Error('알 수 없는 백업 항목입니다');
+    }
+    if(!header||!footer||current)throw new Error('백업 파일이 중간에서 끊겼습니다');
+    return {count,withFile,missing};
   }catch(e){
-    showBackupStatus('백업 실패: '+e.message);
-    showToast('❌ 백업 실패: '+e.message,'err');
-  }finally{
-    backupInProgress=false;buttons.forEach(b=>b.disabled=false);
+    e.message+=` (현재까지 보고서 ${count}건 복원됨)`;throw e;
   }
 }
-
+let restoreInProgress=false;
 async function importData(file){
+  if(!file)return;
+  if(backupInProgress||restoreInProgress){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
+  restoreInProgress=true;
+  try{
+    const prefix=await file.slice(0,4096).text();
+    let first=null;try{first=JSON.parse(prefix.split('\n')[0]);}catch(e){}
+    if(first?.format!==REPORT_BACKUP_FORMAT){await importLegacyData(file);return;}
+    showBackupStatus('대용량 백업 파일을 복원하고 있습니다…');
+    const result=await restorePortableBackup(file,count=>showBackupStatus(`보고서 ${count}건 복원 중…`));
+    await loadReports();
+    const message=`복원된 보고서 ${result.count}건 · 파일 포함 ${result.withFile}건 · 파일 미포함 ${result.missing.length}건`;
+    showBackupStatus(message,result.missing);showToast('✅ '+message,result.missing.length?'w':'ok');
+  }catch(e){
+    await loadReports();showBackupStatus('복원 실패: '+e.message);showToast('❌ 복원 실패: '+e.message,'err');
+  }finally{restoreInProgress=false;}
+}
+
+async function importLegacyData(file){
   if(!file) return;
   try{
     const text=await file.text();
