@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>비정상 상황 보고서 관리 · 경로 연결 백업</title>
+<title>비정상상황 보고서 관리 · 웹</title>
+<script>
+try{document.documentElement.dataset.theme=localStorage.getItem('reportColorTheme')==='dark'?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}
+</script>
 <style>
 :root {
   --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --surface3:#2a2f45;
@@ -415,6 +418,194 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 .confirm-btns { display:flex; gap:10px; justify-content:center; }
 .confirm-btns .btn { min-width:90px; justify-content:center; }
 
+/* Report workspace: compact overview, filters, and results */
+:root { --bg:#f3f6fa; --surface:#fff; --surface2:#f5f7fb; --surface3:#eaf0f7; --accent:#2563eb; --accent2:#edf3ff; --text:#192b43; --muted:#68788f; --faint:#98a6b8; --border:#dfe6ef; --success:#168568; --warn:#aa740c; --danger:#d34f4f; --tag-bg:#eef3fb; --tag-text:#416694; }
+body { background:var(--bg); font-family:'Noto Sans KR','Malgun Gothic',sans-serif; }
+button,input,select { font-family:inherit; }
+button:focus-visible,[tabindex]:focus-visible,select:focus-visible { outline:3px solid #7ca7ff; outline-offset:3px; }
+header { position:sticky; padding:16px 32px; gap:20px; background:#fff; }
+.brand-row { display:flex; align-items:center; gap:12px; flex:1; }
+.brand-mark { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; color:#fff; background:#243e65; font-size:21px; }
+.brand-row h1 { font-size:1rem; letter-spacing:-.04em; word-break:keep-all; }
+.brand-row p { color:var(--muted); font-size:.7rem; margin-top:4px; }
+.header-actions { display:flex; gap:8px; align-items:center; }
+.badge { background:var(--accent2); color:var(--accent); white-space:nowrap; }
+#toggleUploadBtn { padding:10px 15px; }
+.settings-btn:hover { transform:none; }
+.container { max-width:1600px; margin:auto; padding:28px 32px 40px; }
+.page-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+.eyebrow { color:var(--accent); font-size:.65rem; font-weight:800; letter-spacing:.14em; margin-bottom:7px; }
+.page-heading h2 { font-size:1.5rem; letter-spacing:-.05em; }
+.page-heading p { color:var(--muted); font-size:.82rem; margin-top:7px; line-height:1.6; }
+.stats-bar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:24px; }
+.stat { padding:17px 20px; border-radius:12px; display:flex; flex-direction:column; gap:10px; }
+.stat-label { font-size:.76rem; color:var(--muted); }
+.stat strong { color:var(--text); font-size:1.6rem; font-weight:750; letter-spacing:-.035em; }
+.stat strong span { font-size:inherit; color:inherit; }
+.stat small { font-size:.76rem; font-weight:400; margin-left:5px; color:var(--muted); }
+.stat:first-child { background:#243e65; border-color:#243e65; }
+.stat:first-child .stat-label { color:#bbcde6; }
+.stat:first-child strong,.stat:first-child small { color:#fff; }
+.stat #stLatest { font-size:1.2rem; }
+.workspace { display:grid; grid-template-columns:260px minmax(0,1fr); align-items:start; gap:24px; }
+.workspace:not(.filters-open) { grid-template-columns:minmax(0,1fr); }
+.filter-sidebar { display:none; flex-direction:column; gap:16px; }
+.workspace.filters-open .filter-sidebar { display:flex; }
+.filter-panel,.top10-wrap,.data-panel { background:#fff; border:1px solid var(--border); border-radius:12px; padding:18px; margin:0; }
+.panel-heading { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.panel-heading h3,.data-panel h3 { font-size:.88rem; }
+.filter-sidebar label { display:block; font-size:.75rem; color:var(--muted); font-weight:600; margin-bottom:8px; }
+.filter-sidebar .fg { margin-bottom:18px; }
+.filter-sidebar .fg:last-child { margin-bottom:0; }
+select { min-width:0; max-width:100%; background:#fff; color:var(--text); border:1px solid var(--border); padding:10px; border-radius:7px; font-size:.78rem; }
+.filter-sidebar select { width:100%; }
+.date-hint { line-height:1.6; margin-top:9px; font-size:.7rem; color:var(--muted); }
+.storage-filters { display:flex; flex-direction:column; gap:4px; }
+.storage-filter { display:flex; justify-content:space-between; align-items:center; border:1px solid transparent; background:transparent; padding:10px; color:var(--muted); cursor:pointer; border-radius:7px; font-size:.78rem; }
+.storage-filter b { font-size:.72rem; font-weight:600; }
+.storage-filter:hover { background:var(--surface2); }
+.storage-filter.active { color:var(--accent); background:var(--accent2); border-color:#d5e3ff; font-weight:700; }
+.top10-header { width:100%; border:0; background:transparent; color:var(--text); font-family:inherit; text-align:left; cursor:default; gap:12px; flex-wrap:wrap; }
+.top10-controls { display:flex; align-items:center; gap:8px; }
+.results > .top10-wrap { margin-bottom:16px; }
+.top10-empty { color:var(--muted); font-size:.78rem; padding:8px 0; grid-column:1 / -1; }
+.top10-header h3 { font-size:.84rem; }
+.top10-body { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); max-height:280px; overflow:auto; gap:8px 16px; }
+.top10-item { background:transparent; border-color:transparent; padding:8px 4px; font-family:inherit; text-align:left; min-width:0; }
+.top10-item.active { background:var(--accent2); border-color:#bfd4ff; box-shadow:none; }
+.top10-item.active .top10-tag { color:var(--accent); }
+.top10-bar { background:var(--surface3); height:2px; }
+.top10-rank { color:var(--muted); }
+.data-panel p { font-size:.73rem; line-height:1.65; color:var(--muted); margin:10px 0 14px; }
+.data-actions { display:flex; gap:6px; }
+.data-actions .btn { flex:1; justify-content:center; }
+.results { min-width:0; }
+.sidebar-toggle { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.sidebar-toggle[aria-expanded="true"] { background:var(--accent2); border-color:var(--accent); }
+.search-wrap { min-height:54px; margin-bottom:12px; border-radius:10px; box-shadow:0 3px 12px #233c6505; }
+.search-wrap:focus-within { border-color:#7ca7ff; box-shadow:0 0 0 3px #2563eb10; }
+.search-wrap input { min-width:0; font-size:.84rem; }
+.active-filters:empty { display:none; }
+.results-toolbar { display:flex; align-items:center; gap:12px; justify-content:space-between; margin:20px 0 12px; }
+.results-title { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.results-title h3 { font-size:.9rem; }
+#resultCount { font-size:.75rem; color:var(--muted); }
+.view-controls { display:flex; gap:8px; align-items:center; }
+.view-switch { display:flex; background:#e9eef5; padding:3px; border-radius:8px; }
+.view-switch button { border:0; background:transparent; color:var(--muted); padding:7px 10px; border-radius:5px; cursor:pointer; font-size:.74rem; }
+.view-switch button.active { background:#fff; color:var(--accent); box-shadow:0 1px 4px #233c6510; }
+.reports-grid { grid-template-columns:1fr; gap:10px; }
+.report-card { border-radius:10px; padding:17px 20px; position:relative; box-shadow:0 2px 5px #233c6503; }
+.report-card:hover { transform:none; border-color:#97b7ed; box-shadow:0 4px 15px #233c6509; }
+.card-delete { position:absolute;top:13px;right:13px;width:32px;height:32px;display:grid;place-items:center;border:1px solid #f0d9d9;border-radius:7px;background:#fff;color:var(--danger);cursor:pointer; }
+.card-delete:hover { background:#fff1f1;border-color:var(--danger); }
+.report-card .report-name { padding-right:34px; }
+.report-card .card-top-right { padding-right:36px; }
+.report-name { color:var(--text); font-size:.9rem; font-weight:700; margin:10px 0 7px; }
+.report-memo { color:var(--muted); font-size:.78rem; -webkit-line-clamp:2; }
+.report-tag { border-radius:5px; font-size:.7rem; padding:3px 7px; }
+.reports-grid.card-view { grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); }
+.reports-grid.card-view .report-name { white-space:normal; overflow-wrap:anywhere; }
+.reports-grid.card-view .report-memo { -webkit-line-clamp:3; }
+.empty-state { border:1px dashed #cbd6e4; border-radius:12px; background:#ffffff80; padding:70px 20px; }
+.empty-state p:first-of-type { color:var(--text); font-weight:700; }
+.empty-state .btn { margin-top:22px; }
+.upload-panel { background:#eaf0f8; padding:0 32px; }
+.upload-panel.open { max-height:420px; padding:18px 32px; }
+.upload-inner { max-width:1536px; }
+.drop-zone { background:#fff; padding:26px; }
+.panel-actions { flex-direction:row; flex-wrap:wrap; max-width:360px; }
+.modal,.confirm-box,.autocomplete-list,.toast { background:#fff; box-shadow:0 16px 60px #182c4526; }
+.overlay,.confirm-overlay { background:#12243c80; backdrop-filter:blur(3px); }
+.search-hit { color:#126c51; background:#e2f5ed; }
+.report-tag.search-hit-tag { color:#126c51; border-color:#a8dcc8; background:#e2f5ed; box-shadow:none; }
+.xlsx-wrap,.preview-text { background:var(--surface2); color:var(--text); }
+.syn-add-row input { min-width:0; }
+@media(min-width:1250px) {
+ .reports-grid:not(.card-view) .report-card { display:grid; grid-template-columns:190px minmax(0,1fr); column-gap:22px; }
+ .reports-grid:not(.card-view) .card-top { grid-column:1; grid-row:1 / span 4; flex-direction:column; justify-content:flex-start; gap:12px; margin:0; border-right:1px solid #edf1f6; padding-right:16px; }
+ .reports-grid:not(.card-view) .report-name,.reports-grid:not(.card-view) .report-memo,.reports-grid:not(.card-view) .report-tags { grid-column:2; }
+ .reports-grid:not(.card-view) .report-name { margin-top:0; }
+}
+@media(max-width:1000px) { header { padding:14px 20px; } .container { padding:24px 20px; } .workspace { grid-template-columns:225px minmax(0,1fr); gap:18px; } .header-actions .btn { font-size:.75rem; padding:8px; } }
+@media(max-width:760px) {
+ .sidebar-toggle { margin-bottom:12px; width:100%; justify-content:space-between; }
+ .filter-sidebar { display:none; }
+ .workspace.filters-open .filter-sidebar { display:flex; }
+ header { flex-wrap:wrap; gap:12px; padding:12px 16px; position:static; } .brand-row p { display:none; } .brand-row h1 { font-size:.9rem; } .brand-mark { width:32px; height:32px; } .header-actions { margin-left:auto; } .header-actions .settings-btn { font-size:.85rem; } #toggleUploadBtn { font-size:.75rem; padding:9px; } .badge { display:none; }
+ .container { padding:20px 16px; } .page-heading h2 { font-size:1.25rem; } .stats-bar { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-bottom:18px; } .stat { padding:14px; } .stat strong { font-size:1.3rem; }
+ .workspace { grid-template-columns:1fr; gap:18px; } .filter-sidebar { gap:12px; } .filter-panel { padding:14px; } .panel-heading { margin-bottom:12px; } .storage-filters { flex-direction:row; flex-wrap:wrap; } .storage-filter { gap:9px; padding:8px; } .filter-sidebar .fg { margin-bottom:12px; } .top10-body { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:160px; } .data-panel { padding:14px; } .data-panel p { margin:7px 0 10px; }
+ .results-toolbar { flex-wrap:wrap; margin-top:16px; } .view-controls { margin-left:auto; } .search-wrap { padding:10px; } .search-wrap input { font-size:.78rem; } .report-card { padding:15px; } .upload-panel.open { padding:14px 16px; max-height:550px; } .panel-actions { max-width:none; } .drop-zone { min-width:0; width:100%; } .upload-inner { flex-direction:column; align-items:stretch; } .reports-grid.card-view { grid-template-columns:1fr; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; } }
+
+html { color-scheme:light; }
+html[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#101722; --surface:#192333; --surface2:#202d40; --surface3:#2a3950;
+  --accent:#85b4ff; --accent2:#233b5f; --text:#e5edf8; --muted:#a5b4c9;
+  --faint:#8090a7; --border:#35445b; --success:#6ee7b7; --warn:#f6cd71;
+  --danger:#ff9494; --tag-bg:#263c57; --tag-text:#a8cdff;
+}
+html[data-theme="dark"] header,
+html[data-theme="dark"] .filter-panel,
+html[data-theme="dark"] .top10-wrap,
+html[data-theme="dark"] .data-panel,
+html[data-theme="dark"] select,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .confirm-box,
+html[data-theme="dark"] .autocomplete-list,
+html[data-theme="dark"] .toast,
+html[data-theme="dark"] .card-delete { background:var(--surface); }
+html[data-theme="dark"] .upload-panel,
+html[data-theme="dark"] .view-switch { background:var(--surface3); }
+html[data-theme="dark"] .drop-zone,
+html[data-theme="dark"] .view-switch button.active,
+html[data-theme="dark"] .empty-state { background:var(--surface2); }
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .card-delete,
+html[data-theme="dark"] .storage-filter.active,
+html[data-theme="dark"] .top10-item.active,
+html[data-theme="dark"] .reports-grid:not(.card-view) .card-top { border-color:var(--border); }
+html[data-theme="dark"] .card-delete:hover { background:#462c37; border-color:var(--danger); }
+html[data-theme="dark"] .overlay,
+html[data-theme="dark"] .confirm-overlay { background:#050b16c4; }
+html[data-theme="dark"] .search-hit,
+html[data-theme="dark"] .report-tag.search-hit-tag { color:#91eac1; background:#1e493d; border-color:#41866b; }
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] #toggleUploadBtn { background:#316bdc; color:#fff; }
+html[data-theme="dark"] .btn-primary:hover,
+html[data-theme="dark"] #toggleUploadBtn:hover { background:#407eea; }
+.theme-toggle { white-space:nowrap; }
+.delete-grace { position:fixed; bottom:20px; left:20px; z-index:500; width:min(560px,calc(100vw - 40px)); max-height:40vh; overflow:auto; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 8px 30px #0003; }
+.delete-grace[hidden] { display:none; }
+.delete-grace-row { display:flex; align-items:center; gap:12px; padding:8px 4px; }
+.delete-grace-row + .delete-grace-row { border-top:1px solid var(--border); }
+.delete-grace-message { flex:1; min-width:0; font-size:.8rem; line-height:1.6; }
+.delete-grace-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
+.delete-grace-count { color:var(--danger); font-weight:700; }
+.delete-grace-row .btn { flex-shrink:0; }
+.operation-picker { position:relative; }
+.operation-trigger,.operation-choice { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:8px; text-align:left; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); cursor:pointer; font-size:.82rem; }
+.operation-trigger .operation-arrow { margin-left:auto; color:var(--muted); }
+.operation-menu { margin-top:6px; padding:6px; border:1px solid var(--border); border-radius:8px; background:var(--surface); max-height:250px; overflow-y:auto; }
+.operation-menu[hidden] { display:none; }
+.operation-choice { border-color:transparent; border-radius:6px; }
+.operation-choice:hover,.operation-choice:focus-visible { background:var(--surface2); }
+.operation-choice[aria-selected="true"] { background:var(--accent2); border-color:var(--accent); }
+.operation-date { font-variant-numeric:tabular-nums; }
+.operation-unit,.operation-action { padding:3px 8px; border-radius:5px; font-weight:700; white-space:nowrap; }
+.operation-unit.unit-1 { color:#176847; background:#e2f4eb; border:1px solid #a6d9bf; }
+.operation-unit.unit-2 { color:#7441a8; background:#f1e8fb; border:1px solid #d2b8ee; }
+.operation-action.start { color:#b72f37; background:#fff0f0; border:1px solid #f4b7bd; }
+.operation-action.stop { color:#215cbc; background:#edf4ff; border:1px solid #b2ccf5; }
+html[data-theme="dark"] .operation-unit.unit-1 { color:#92e7ba; background:#203f33; border-color:#406853; }
+html[data-theme="dark"] .operation-unit.unit-2 { color:#d9b5ff; background:#382c4e; border-color:#654d85; }
+html[data-theme="dark"] .operation-action.start { color:#ff9da5; background:#4c2931; border-color:#89515b; }
+html[data-theme="dark"] .operation-action.stop { color:#9dc4ff; background:#243b60; border-color:#4c6c9c; }
+@media(max-width:760px) { .header-actions { flex-wrap:wrap; } }
+
+.web-storage-note { font-size:.78rem; line-height:1.7; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--muted); margin-bottom:18px; }
 </style>
 <!-- PDF.js: PDF 렌더링 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -424,85 +615,71 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js"></script>
 </head>
 <body>
+<input type="file" id="webFolderInput" webkitdirectory directory multiple hidden onchange="onWebFolderSelected(Array.from(this.files)).catch(e=>showToast(e.message,'err'));this.value=''">
+<input type="file" id="webReconnectInput" hidden onchange="onWebReconnectSelected(this.files[0]);this.value=''">
 
 <!-- ═══ HEADER ═══ -->
 <header>
-  <span style="font-size:1.4rem">👨‍🔧</span>
-  <h1>비정상 상황 보고서 관리</h1>
-  <span class="badge" id="totalBadge">0건</span>
-  <button class="settings-btn" id="settingsBtn" onclick="openSettingsModal()" title="동의어 매핑 설정">⚙️</button>
-  <button id="toggleUploadBtn" onclick="togglePanel()">
-    📂 파일 등록 <em class="arrow">▲</em>
-  </button>
+  <div class="brand-row"><span class="brand-mark" aria-hidden="true">▤</span><div><h1>비정상 상황 보고서</h1><p>GitHub Pages 웹 전용 · 브라우저 저장</p></div><span class="badge" id="totalBadge">0건</span></div>
+  <div class="header-actions"><button type="button" class="btn btn-ghost btn-sm theme-toggle" id="themeToggle" onclick="toggleReportTheme()" aria-pressed="false">🌙 다크모드</button><button class="btn btn-ghost btn-sm settings-btn" id="settingsBtn" onclick="openSettingsModal()" title="검색 동의어 설정">⚙ 동의어 설정</button><button id="toggleUploadBtn" onclick="togglePanel()" aria-expanded="false" aria-controls="uploadPanel">＋ 파일 등록 <em class="arrow">▼</em></button></div>
 </header>
 
 <!-- ═══ UPLOAD PANEL ═══ -->
-<div class="upload-panel" id="uploadPanel">
+<div class="upload-panel" id="uploadPanel" inert>
   <div class="upload-inner">
-    <div class="drop-zone" id="dropZone" onclick="fi.click()">
+    <div class="drop-zone" id="dropZone" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();fi.click();}" onclick="fi.click()">
       <strong>📄 드래그 또는 클릭하여 파일 선택</strong>
       <p>파일명의 날짜(260401, 20260401, 2026-04-01 등) 자동 인식</p>
       <input type="file" id="fi" style="display:none" multiple>
     </div>
     <div class="panel-actions">
-      <button class="btn btn-primary" onclick="selectFiles()">📄 파일 선택 (경로 직접)</button>
+      <button class="btn btn-primary" onclick="selectFiles()">📄 파일 등록 (브라우저 보관)</button>
       <button class="btn btn-ghost" onclick="selectFolder()">📁 폴더 스캔</button>
-      <button class="btn btn-success" onclick="exportData()">💾 경로 연결 백업 (가벼운 JSON)</button>
-      <button class="btn btn-ghost" onclick="exportWithFiles()">PDF 포함 백업 (다른 PC 이동용)</button>
-      <button class="btn btn-warn" onclick="document.getElementById('importInput').click()">📥 복원 (백업/JSON)</button>
-      <input type="file" id="importInput" style="display:none" accept=".reportbackup,.json"
-             onchange="importData(this.files[0]);this.value=''">
+
       <button class="btn btn-ghost" onclick="togglePanel()">✕ 닫기</button>
     </div>
   </div>
 </div>
 
 <!-- ═══ MAIN ═══ -->
-<div class="container">
-  <section style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;font-size:.83rem;line-height:1.8">
-    <strong>경로 연결 백업 버전</strong><br>
-    가벼운 JSON에는 보고서 정보와 기존 연결을 찾는 참조만 저장합니다.
-    같은 PC·브라우저의 저장소에 원본 연결이 남아 있으면 새 관리 화면에서 복원할 때 자동으로 이어집니다.<br>
-    원본 접근 권한이 필요하면 허용해 주세요. 다른 PC·브라우저나 저장소 삭제 후에는 원본 재연결 또는 PDF 포함 백업이 필요합니다.
-    <div id="backupStatus" role="status" style="margin-top:10px;overflow-wrap:anywhere"></div>
-  </section>
-  <div class="browser-warn" id="bwarn">
-    ⚠️ 파일 경로 직접 접근은 <strong>Chrome / Edge</strong>에서만 지원됩니다.
-    현재 브라우저에서는 파일 업로드 방식을 사용해 주세요.
-  </div>
-
+<main class="container">
+  <div class="page-heading"><div><div class="eyebrow">OPERATIONS ARCHIVE</div><h2>운전 이슈 검색 및 기록</h2><p>보고서와 조치 이력을 검색하고 관련 기동·정지 기록을 함께 확인</p></div></div>
+  <div class="web-storage-note" id="bwarn">웹 전용 · 등록한 파일은 이 PC의 브라우저에 보관됩니다. PC 버전 자료는 파일 포함 백업으로 복원하세요. 다른 PC·브라우저와 자동 동기화되지는 않습니다.</div>
   <div class="queue-bar" id="queueBar"></div>
-
-  <div class="stats-bar" id="statsBar" style="display:none">
-    <div class="stat">총 <span id="stTotal">0</span>건</div>
-    <div class="stat">해시태그 <span id="stTags">0</span>개</div>
-    <div class="stat">최근 <span id="stLatest">-</span></div>
+  <section class="stats-bar" id="statsBar" aria-label="전체 보고서 현황">
+    <div class="stat"><div class="stat-label">전체 보고서</div><strong><span id="stTotal">0</span><small>건</small></strong></div>
+    <div class="stat"><div class="stat-label">등록된 해시태그</div><strong><span id="stTags">0</span><small>개</small></strong></div>
+    <div class="stat"><div class="stat-label">기동·정지 연결 보고서</div><strong><span id="stLinked">0</span><small>건</small></strong></div>
+    <div class="stat"><div class="stat-label">최근 보고서 날짜</div><strong><span id="stLatest">-</span></strong></div>
+  </section>
+  <button type="button" id="sidebarToggle" class="btn btn-ghost sidebar-toggle" aria-expanded="false" aria-controls="reportFilters" onclick="const open=document.querySelector('.workspace').classList.toggle('filters-open');this.setAttribute('aria-expanded',String(open));this.textContent=open?'조회 조건·태그·데이터 관리 접기 −':'조회 조건·태그·데이터 관리 펼치기 ＋';">조회 조건·태그·데이터 관리 펼치기 ＋</button>
+  <div class="workspace">
+    <aside class="filter-sidebar" id="reportFilters" aria-label="보고서 필터">
+      <section class="filter-panel">
+        <div class="panel-heading"><h3>조회 조건</h3></div>
+        <div class="fg"><label for="operationFilter">관련 기동·정지</label><select id="operationFilter" onchange="applySearch()"></select><div class="date-hint" id="operationHint"></div></div>
+        <div class="fg"><label>파일 보관 상태</label><div class="storage-filters">
+          <button class="storage-filter active" data-storage="all" aria-pressed="true" onclick="setStorageFilter('all')">전체 보고서 <b id="countAll">0</b></button>
+          <button class="storage-filter" data-storage="copy" aria-pressed="false" onclick="setStorageFilter('copy')">내부 보관 <b id="countCopy">0</b></button>
+          <button class="storage-filter" data-storage="link" aria-pressed="false" onclick="setStorageFilter('link')">경로 연결 <b id="countLink">0</b></button>
+          <button class="storage-filter" data-storage="none" aria-pressed="false" onclick="setStorageFilter('none')">파일 없음 <b id="countNone">0</b></button>
+        </div></div>
+      </section>
+      <section class="data-panel"><h3>데이터 관리</h3><p>보고서와 파일은 이 브라우저에 자동 저장됩니다. 다른 PC로 옮길 때는 파일 포함 백업을 사용하세요.</p><div id="reportDiskStatus" role="status" style="font-size:.73rem;line-height:1.7">브라우저 저장소 확인 중…</div><button type="button" class="btn btn-ghost btn-sm" style="width:100%;margin-top:10px;justify-content:center" onclick="requestWebPersistentStorage()">브라우저 지속 저장 요청</button><button class="btn btn-primary btn-sm" style="width:100%;margin-top:12px;justify-content:center" onclick="exportWithFiles()">↓ 파일 포함 백업</button><div class="data-actions" style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="exportData()">↓ 정보만 백업</button><button class="btn btn-ghost btn-sm" onclick="document.getElementById('importInput').click()">↑ 백업 복원</button></div><button type="button" class="btn btn-ghost btn-sm" style="width:100%;margin-top:12px;justify-content:center" onclick="connectReportFolder()">📁 원본 폴더에서 파일 가져오기</button><button id="formatReportsBtn" type="button" class="btn btn-danger btn-sm" style="width:100%;margin-top:14px;justify-content:center" onclick="requestFormatReports()">⚠ 전체 포맷</button><input type="file" id="importInput" hidden accept=".reportbackup,.json" onchange="importData(this.files[0]);this.value=''"></section>
+    </aside>
+    <section class="results" aria-label="보고서 검색 및 목록">
+      <section class="top10-wrap" id="top10Wrap" aria-label="자주 쓰는 태그">
+        <div class="top10-header"><h3>자주 쓰는 태그 <span id="top10Summary" style="color:var(--muted);font-size:.7rem">TOP 10</span></h3><div class="top10-controls"><select id="top10Limit" aria-label="태그 표시 개수" onchange="setTop10Limit(this.value)"><option value="all">전체</option><option value="10" selected>TOP 10</option><option value="20">TOP 20</option><option value="30">TOP 30</option></select><button type="button" id="top10Toggle" class="btn btn-ghost btn-sm" onclick="toggleTop10()" aria-expanded="true" aria-controls="top10Body">최소화 ▲</button></div></div>
+        <div id="top10Body" class="top10-body"></div>
+      </section>
+      <div class="search-wrap" id="searchWrap"><span aria-hidden="true">⌕</span><input type="text" id="searchInp" aria-label="보고서 검색" placeholder="파일명, 조치 내용, #해시태그 검색" autocomplete="off"><button class="btn btn-ghost btn-sm" onclick="clearSearch()">지우기</button><div class="autocomplete-list" id="acList"></div></div>
+      <div class="active-filters" id="activeFilters"></div>
+      <div class="results-toolbar"><div class="results-title"><h3>보고서 목록</h3><span id="resultCount" aria-live="polite">0건</span></div><div class="view-controls"><select id="sortOrder" aria-label="보고서 정렬" onchange="applySearch()"><option value="newest">최신 날짜순</option><option value="oldest">오래된 날짜순</option><option value="name">파일명순</option></select><div class="view-switch" aria-label="보기 방식"><button type="button" id="listViewBtn" class="active" aria-pressed="true" onclick="setReportView('list')">☰ 목록</button><button type="button" id="cardViewBtn" aria-pressed="false" onclick="setReportView('card')">▦ 카드</button></div></div></div>
+      <div class="reports-grid" id="reportsGrid"></div>
+      <div class="empty-state" id="emptyState"><div class="ei">▤</div><p>등록된 보고서가 없습니다</p><p style="font-size:.82rem;margin-top:8px;line-height:1.7">파일 등록 버튼으로 첫 보고서를 추가하세요.</p><button class="btn btn-primary" id="emptyAction" onclick="togglePanel()">＋ 첫 보고서 등록</button></div>
+    </section>
   </div>
-
-  <!-- 해시태그 Top 10 -->
-  <div class="top10-wrap" id="top10Wrap" style="display:none">
-    <div class="top10-header" onclick="toggleTop10()">
-      <h3>🏷️ 해시태그 순위</h3>
-      <span class="top10-toggle" id="top10Arrow">▲</span>
-    </div>
-    <div id="top10Body" class="top10-body"></div>
-  </div>
-
-  <div class="search-wrap" id="searchWrap">
-    <span>🔍</span>
-    <input type="text" id="searchInp" placeholder="#해시태그 또는 키워드로 검색  (예: #보일러  #긴급  압력이상)" autocomplete="off">
-    <button class="btn btn-ghost btn-sm" onclick="clearSearch()">초기화</button>
-    <div class="autocomplete-list" id="acList"></div>
-  </div>
-  <div class="active-filters" id="activeFilters"></div>
-
-  <div class="reports-grid" id="reportsGrid"></div>
-  <div class="empty-state" id="emptyState">
-    <div class="ei">📋</div>
-    <p>등록된 레포트가 없습니다</p>
-    <p style="font-size:.82rem;margin-top:6px">헤더의 <strong>📂 파일 등록</strong> 버튼으로 파일을 등록하세요</p>
-  </div>
-</div>
+</main>
 
 <!-- ═══ UPLOAD / EDIT MODAL ═══ -->
 <div class="overlay" id="upModal">
@@ -529,6 +706,15 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
       <div class="tags-wrap" id="tagsWrap">
         <input type="text" class="tinput" id="tinput" placeholder="#보일러  #압력  #긴급  #SOx ...">
       </div>
+    </div>
+    <div class="fg">
+      <label id="upOperationLabel" for="operationPickerTrigger">관련 기동/정지 (선택 사항)</label>
+      <select id="upOperation" hidden aria-hidden="true" tabindex="-1"></select>
+      <div class="operation-picker" id="operationPicker">
+        <button type="button" id="operationPickerTrigger" class="operation-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="operationPickerMenu" onclick="toggleOperationPicker()">연결 안 함 <span class="operation-arrow">▼</span></button>
+        <div id="operationPickerMenu" class="operation-menu" role="listbox" aria-labelledby="upOperationLabel" hidden></div>
+      </div>
+      <div class="date-hint">복원된 보고서의 기동/정지 기록 또는 같은 웹 주소에서 연동한 기록을 선택하세요.</div>
     </div>
     <div class="fg">
       <label>트러블 내용 및 조치 사항</label>
@@ -662,11 +848,26 @@ header h1 { font-size:1rem; font-weight:700; flex:1; }
 </div>
 
 <div class="toast" id="toast"></div>
+<section id="deleteGrace" class="delete-grace" aria-label="보고서 삭제 대기" hidden></section>
 
 <script>
+function updateReportThemeButton(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  const button=document.getElementById('themeToggle');
+  button.textContent=dark?'☀️ 라이트모드':'🌙 다크모드';
+  button.setAttribute('aria-pressed',String(dark));
+  button.setAttribute('aria-label',dark?'라이트모드로 전환':'다크모드로 전환');
+}
+function toggleReportTheme(){
+  const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  document.documentElement.dataset.theme=theme;
+  try{localStorage.setItem('reportColorTheme',theme);}catch(e){}
+  updateReportThemeButton();
+}
+updateReportThemeButton();
 // ═══ IndexedDB ═══
 let db;
-const DB='TroubleshootDB', VER=3, ST='reports';
+const DB='TroubleshootWebDB', VER=3, ST='reports';
 function initDB(){
   return new Promise((res,rej)=>{
     const r=indexedDB.open(DB,VER);
@@ -685,15 +886,196 @@ const dbo=(mode,fn)=>new Promise((res,rej)=>{
   tx.onabort=()=>rej(tx.error||r.error||new Error('저장이 취소됐습니다'));
   tx.onerror=()=>rej(tx.error||r.error);
 });
-const dbAdd=d=>dbo('readwrite',s=>s.add(d));
-const dbPut=d=>dbo('readwrite',s=>s.put(d));
-const dbDel=id=>dbo('readwrite',s=>s.delete(id));
+const dbAdd=async d=>{const result=await dbo('readwrite',s=>s.add(d));markReportDiskPending();return result;};
+const dbPut=async d=>{const result=await dbo('readwrite',s=>s.put(d));markReportDiskPending();return result;};
+const dbDel=async id=>{const result=await dbo('readwrite',s=>s.delete(id));markReportDiskPending();return result;};
 const dbGet=id=>dbo('readonly',s=>s.get(id));
 const dbAll=()=>dbo('readonly',s=>s.getAll());
 
+const reportDiskReady=false;
+function markReportDiskPending(){}
+async function saveReportsToDisk(){
+  const label=document.getElementById('reportDiskStatus');
+  if(label){label.textContent='브라우저 자동 저장 · '+allReports.length+'건 (이 PC·브라우저에 보관)';label.style.color='var(--success)';}
+}
+async function requestWebPersistentStorage(){
+  try{const granted=await navigator.storage?.persist?.();showToast(granted?'브라우저의 지속 저장을 허용받았습니다.':'자동 저장은 사용 중입니다. 중요한 자료는 파일 포함 백업도 보관해 주세요.',granted?'ok':'w');}catch(e){showToast('자동 저장은 사용 중입니다. 파일 포함 백업을 함께 보관해 주세요.','w');}
+}
+// Work-Hub 연동: 파일은 기존 DB에 유지하고 관련 운전 기록만 추가 저장합니다.
+const OPERATION_CATALOG_KEY='report_web_operations_v1';
+const REPORT_INDEX_KEY='report_web_linked_reports_v1';
+const reportIndexBridge=false;
+if(reportIndexBridge) document.documentElement.style.display='none';
+function linkedReportIndex(reports){
+  return reports.filter(r=>validOperation(r.operation)).map(r=>({id:r.id,filename:String(r.filename||'보고서'),operation:validOperation(r.operation)}));
+}
+function publishLinkedReportIndex(index){
+  index.sort((a,b)=>a.id-b.id);
+  // 파일 내용/핸들은 보내지 않고 뱃지에 필요한 정보만 전달합니다.
+  try{
+    const value=JSON.stringify(index);
+    if(localStorage.getItem(REPORT_INDEX_KEY)!==value) localStorage.setItem(REPORT_INDEX_KEY,value);
+  }catch(e){console.warn('보고서 뱃지 목록 저장 실패',e);}
+  if(window.parent!==window) window.parent.postMessage({type:'workhub-report-index',reports:index},location.origin==='null'?'*':location.origin);
+}
+async function refreshLinkedReportIndex(){
+  const result=await new Promise((resolve,reject)=>{
+    let total=0;
+    const rows=[],tx=db.transaction(ST,'readonly'),request=tx.objectStore(ST).openCursor();
+    request.onsuccess=()=>{
+      const cursor=request.result;
+      if(!cursor) return;
+      total++;
+      rows.push(...linkedReportIndex([cursor.value]));
+      cursor.continue();
+    };
+    tx.oncomplete=()=>resolve({rows,total});
+    tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+  });
+  // 로컬 파일의 프레임 저장소가 비어 있으면 별도 창에서 발행한 목록을 보존합니다.
+  if(reportIndexBridge && result.total===0){
+    try{
+      const saved=JSON.parse(localStorage.getItem(REPORT_INDEX_KEY)||'[]');
+      if(Array.isArray(saved) && saved.length){
+        window.parent.postMessage({type:'workhub-report-index',reports:linkedReportIndex(saved)},location.origin==='null'?'*':location.origin);
+        return;
+      }
+    }catch(e){console.warn('저장된 보고서 뱃지 목록 읽기 실패',e);}
+  }
+  publishLinkedReportIndex(result.rows);
+}
+window.addEventListener('storage',e=>{
+  if(!reportIndexBridge || e.key!==REPORT_INDEX_KEY || !db) return;
+  refreshLinkedReportIndex().catch(err=>console.warn('보고서 뱃지 갱신 실패',err));
+});
+window.addEventListener('message',e=>{
+  if(!reportIndexBridge || e.source!==window.parent || e.origin!==location.origin || e.data?.type!=='workhub-report-index-request' || !db) return;
+  refreshLinkedReportIndex().catch(err=>console.warn('보고서 뱃지 갱신 실패',err));
+});
+let reportOperations=[];
+try { reportOperations=JSON.parse(localStorage.getItem(OPERATION_CATALOG_KEY)||'[]'); } catch(e) {}
+if(!Array.isArray(reportOperations)) reportOperations=[];
+function validOperation(value){
+  if(!value || typeof value.id!=='string' || !value.id || ![1,2].includes(Number(value.unit)) || !['기동','정지'].includes(value.action)) return null;
+  return {id:value.id,unit:Number(value.unit),action:value.action,date:String(value.date||''),time:String(value.time||'')};
+}
+reportOperations=reportOperations.map(validOperation).filter(Boolean);
+function operationLabel(op){return `${op.date} ${op.time||'시각 미입력'} · ${op.unit}호기 ${op.action}`;}
+function reportOperationMatches(report,op){
+  if(!report.operation || !op) return false;
+  if(report.operation.id===op.id) return true;
+  const same=(a,b)=>!!a?.date && !!a?.time && a.date===b?.date && a.time===b?.time && Number(a.unit)===Number(b?.unit) && a.action===b?.action;
+  if(!same(report.operation,op)) return false;
+  const candidates=reportOperations.filter(item=>same(item,op));
+  return candidates.length===1 && candidates[0].id===op.id;
+}
+function operationChoices(){
+  const map=new Map();
+  allReports.forEach(r=>{const op=validOperation(r.operation);if(op) map.set(op.id,op);});
+  reportOperations.forEach(op=>map.set(op.id,op));
+  return [...map.values()].sort((a,b)=>(b.date+' '+b.time).localeCompare(a.date+' '+a.time));
+}
+function fillOperationSelect(select, selected, filter){
+  const selectedId=typeof selected==='string' ? selected : selected?.id||'';
+  const choices=operationChoices();
+  if(selected && typeof selected==='object' && !choices.some(op=>op.id===selected.id)) choices.unshift(selected);
+  select.replaceChildren(new Option(filter?'전체 보고서':'연결 안 함', ''));
+  if(filter) select.add(new Option('기동/정지 미연결 보고서','unlinked'));
+  choices.forEach(op=>select.add(new Option(operationLabel(op),op.id)));
+  select.value=selectedId;
+  if(select.id==='upOperation')renderOperationPicker(choices);
+}
+function operationPickerMarkup(op){
+  if(!op)return '<span>연결 안 함</span>';
+  return `<span class="operation-unit unit-${Number(op.unit)}">${Number(op.unit)===1?'① 1호기':'② 2호기'}</span><span class="operation-action ${op.action==='기동'?'start':'stop'}">${esc(op.action)}</span><span class="operation-date">${esc(op.date)} ${esc(op.time||'시각 미입력')}</span>`;
+}
+function renderOperationPicker(choices=operationChoices()){
+  const selected=document.getElementById('upOperation').value;
+  const trigger=document.getElementById('operationPickerTrigger');
+  trigger.innerHTML=operationPickerMarkup(choices.find(op=>op.id===selected))+'<span class="operation-arrow" aria-hidden="true">▼</span>';
+  const menu=document.getElementById('operationPickerMenu');
+  menu.replaceChildren();
+  [null,...choices].forEach(op=>{
+    const button=document.createElement('button');
+    button.type='button';button.className='operation-choice';button.setAttribute('role','option');
+    button.dataset.operationId=op?.id||'';button.setAttribute('aria-selected',String(button.dataset.operationId===selected));
+    button.innerHTML=operationPickerMarkup(op);
+    button.onclick=()=>{document.getElementById('upOperation').value=button.dataset.operationId;renderOperationPicker(choices);toggleOperationPicker(false);trigger.focus();};
+    menu.appendChild(button);
+  });
+  toggleOperationPicker(false);
+}
+function toggleOperationPicker(open){
+  const menu=document.getElementById('operationPickerMenu');
+  const expanded=typeof open==='boolean'?open:menu.hidden;
+  menu.hidden=!expanded;document.getElementById('operationPickerTrigger').setAttribute('aria-expanded',String(expanded));
+  if(expanded)(menu.querySelector('[aria-selected="true"]')||menu.firstElementChild)?.scrollIntoView({block:'nearest'});
+}
+document.getElementById('operationPicker').addEventListener('keydown',e=>{
+  const trigger=document.getElementById('operationPickerTrigger'),menu=document.getElementById('operationPickerMenu');
+  if(e.key==='Escape'&&!menu.hidden){e.preventDefault();e.stopPropagation();toggleOperationPicker(false);trigger.focus();return;}
+  if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key))return;
+  e.preventDefault();e.stopPropagation();if(menu.hidden)toggleOperationPicker(true);
+  const options=[...menu.children],index=options.indexOf(document.activeElement);
+  const target=e.key==='Home'?0:e.key==='End'?options.length-1:index<0?Math.max(0,options.findIndex(el=>el.getAttribute('aria-selected')==='true')):(index+(e.key==='ArrowDown'?1:-1)+options.length)%options.length;
+  options[target]?.focus();
+});
+document.addEventListener('click',e=>{if(!document.getElementById('operationPicker').contains(e.target))toggleOperationPicker(false);});
+function activeOperation(){return operationChoices().find(op=>op.id===document.getElementById('operationFilter').value)||null;}
+function selectedReportOperation(){
+  return operationChoices().find(op=>op.id===document.getElementById('upOperation').value)||null;
+}
+function refreshOperationControls(){
+  fillOperationSelect(document.getElementById('operationFilter'),document.getElementById('operationFilter').value,true);
+  // 편집 중에 목록이 갱신되어도 기존 선택은 유지합니다.
+  fillOperationSelect(document.getElementById('upOperation'),document.getElementById('upOperation').value,false);
+  document.getElementById('operationHint').textContent=reportOperations.length
+    ? 'Work-Hub에서 선택한 기록별로 조회합니다. 기존 보고서는 수정 화면에서 연결할 수 있습니다.'
+    : '기동/정지가 연결된 보고서 백업을 복원하면 선택 목록도 표시됩니다.';
+}
+window.addEventListener('storage',e=>{
+  if(e.key!==OPERATION_CATALOG_KEY) return;
+  try {const ops=JSON.parse(e.newValue||'[]');if(Array.isArray(ops)) reportOperations=ops.map(validOperation).filter(Boolean);} catch(err) {return;}
+  refreshOperationControls();applySearch();
+});
+let reportContextReady=false, pendingReportContext=null, lastOpenedReportContext='';
+async function applyWorkHubReportContext(context){
+  if(!reportContextReady){pendingReportContext=context;return;}
+  if(!Array.isArray(context?.operations)) return;
+  const incoming=context.operations.map(validOperation).filter(Boolean);
+  if(context.partial){
+    const same=(a,b)=>a.id===b.id || (!!a.date && !!a.time && a.date===b.date && a.time===b.time && a.unit===b.unit && a.action===b.action);
+    reportOperations=reportOperations.filter(item=>!incoming.some(op=>same(item,op))).concat(incoming);
+  }else reportOperations=incoming;
+  const op=validOperation(context.operation);
+  if(op && !reportOperations.some(item=>item.id===op.id)) reportOperations.unshift(op);
+  try {localStorage.setItem(OPERATION_CATALOG_KEY,JSON.stringify(reportOperations));} catch(err) {}
+  refreshOperationControls();
+  fillOperationSelect(document.getElementById('operationFilter'),op,true);
+  applySearch();
+  const reportId=Number(context.reportId);
+  if(Number.isSafeInteger(reportId) && reportId>0){
+    const requestKey=op?.id+':'+reportId;
+    if(lastOpenedReportContext===requestKey) return;
+    const report=allReports.find(r=>r.id===reportId && reportOperationMatches(r,op));
+    if(report){lastOpenedReportContext=requestKey;try{await openDetail(reportId);}catch(err){lastOpenedReportContext='';throw err;}}
+    else showToast('보고서가 삭제되었거나 다른 기동/정지로 변경되었습니다.','w');
+  }
+}
+function reportContextFromURL(){
+  const prefix='#workhub-report-open=';
+  if(!location.hash.startsWith(prefix)) return null;
+  try{return JSON.parse(decodeURIComponent(location.hash.slice(prefix.length)));}
+  catch(e){showToast('보고서 바로 열기 정보가 올바르지 않습니다.','err');return null;}
+}
+window.addEventListener('message',e=>{
+  if(window.parent===window || e.source!==window.parent || e.origin!==location.origin || e.data?.type!=='workhub-report-context') return;
+  applyWorkHubReportContext(e.data).catch(err=>showToast('보고서를 열지 못했습니다: '+err.message,'err'));
+});
+
 // ═══ FSA Check ═══
-const FSA='showOpenFilePicker' in window;
-if(!FSA) document.getElementById('bwarn').style.display='block';
+const FSA=false;
+
 
 // ═══ Upload Panel Toggle ═══
 let panelOpen=false;
@@ -703,6 +1085,8 @@ function togglePanel(){
   const btn=document.getElementById('toggleUploadBtn');
   panel.classList.toggle('open',panelOpen);
   btn.classList.toggle('active',panelOpen);
+  btn.setAttribute('aria-expanded',String(panelOpen));
+  panel.inert=!panelOpen;
   btn.querySelector('.arrow').textContent=panelOpen?'▲':'▼';
 }
 
@@ -749,7 +1133,13 @@ function extractDate(name){
 }
 function fmtDate(s){
   if(!s) return '날짜 미지정';
-  const[y,m,d]=s.split('-'); return `${y}년 ${+m}월 ${+d}일`;
+  const match=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(s));
+  if(!match)return '날짜 미지정';
+  const [,y,m,d]=match;
+  const date=new Date(Date.UTC(+y,+m-1,+d));
+  if(date.getUTCFullYear()!==+y||date.getUTCMonth()!==+m-1||date.getUTCDate()!==+d)return '날짜 미지정';
+  const weekday=['일','월','화','수','목','금','토'][date.getUTCDay()];
+  return `${y}년 ${+m}월 ${+d}일 (${weekday})`;
 }
 function fileIcon(n){
   const e=n.split('.').pop().toLowerCase();
@@ -915,6 +1305,19 @@ function normalizeTag(raw){
 
 // ═══ Tags ═══
 let cTags=[];
+function filenameUnitTags(filename){
+  const units=new Set();
+  const pattern=/(?:^|[^0-9])([12])\s*호기|(?:^|[^A-Za-z0-9])unit\s*#\s*([12])(?!\d)|#\s*([12])\s*unit(?![A-Za-z0-9])/gi;
+  for(const match of String(filename||'').matchAll(pattern))units.add(match[1]||match[2]||match[3]);
+  return [...units].sort().map(unit=>'#'+unit+'호기');
+}
+function withFilenameUnitTags(filename,tags=[]){
+  const result=[...tags];
+  for(const tag of filenameUnitTags(filename)){
+    if(!result.some(existing=>String(existing).trim().replace(/^#+/,'')===tag.slice(1)))result.push(tag);
+  }
+  return result;
+}
 function addTag(raw){
   const t=normalizeTag(raw);
   if(!t)return;
@@ -945,26 +1348,15 @@ document.getElementById('tagsWrap').addEventListener('click',()=>tinput.focus())
 // ═══ File Queue ═══
 let fQueue=[], fIdx=0, editId=null, folderHandles=[], replaceFileItem=null;
 
-async function selectFiles(){
-  if(!FSA){showToast('Chrome/Edge를 사용해 주세요','err');return;}
-  try{
-    const hs=await window.showOpenFilePicker({multiple:true});
-    if(panelOpen) togglePanel();
-    startQueue(hs);
-  }catch(e){if(e.name!=='AbortError')showToast('오류: '+e.message,'err');}
+function selectFiles(){fi.click();}
+function selectFolder(){document.getElementById('webFolderInput').dataset.mode='register';document.getElementById('webFolderInput').click();}
+async function onWebFolderSelected(files){
+  if(!files.length)return;
+  if(reportTasksBusy()){showToast('진행 중인 작업이 끝난 뒤 다시 선택하세요.','w');return;}
+  if(document.getElementById('webFolderInput').dataset.mode==='connect'){await connectWebFolderFiles(files);return;}
+  if(panelOpen)togglePanel();
+  await showFolderModal(files.map(file=>({kind:'file',name:file.name,_file:file,getFile:async()=>file})));
 }
-async function selectFolder(){
-  if(!FSA){showToast('Chrome/Edge를 사용해 주세요','err');return;}
-  try{
-    const dir=await window.showDirectoryPicker();
-    const hs=[];
-    for await(const[,h] of dir.entries()) if(h.kind==='file') hs.push(h);
-    if(!hs.length){showToast('파일이 없습니다','w');return;}
-    if(panelOpen) togglePanel();
-    showFolderModal(hs);
-  }catch(e){if(e.name!=='AbortError')showToast('오류: '+e.message,'err');}
-}
-
 // 드래그 업로드용 (파일 핸들 없이 File 객체 직접 사용)
 function handleFiles(items){
   if(!items.length)return;
@@ -1030,7 +1422,8 @@ async function openNextInQueue(){
 }
 
 function proceedModal(item, file){
-  editId=null; cTags=[];
+  editId=null; cTags=withFilenameUnitTags(file.name);
+  fillOperationSelect(document.getElementById('upOperation'), activeOperation(), false);
   document.getElementById('upTitle').textContent='📋 레포트 정보 입력';
   document.getElementById('upSaveBtn').textContent='💾 저장';
   document.getElementById('upSaveBtn').onclick=saveReport;
@@ -1071,7 +1464,7 @@ async function saveReport(){
     await dbAdd({
       fileHandle:handle, fileData:buf,
       filename:file.name, fileSize:file.size, fileType:file.type,
-      date, tags:[...cTags], memo, createdAt:new Date().toISOString()
+      date, tags:[...cTags], memo, operation: selectedReportOperation(), createdAt:new Date().toISOString()
     });
     fIdx++; await loadReports(); showToast('✅ 저장됐습니다','ok');
     openNextInQueue();
@@ -1087,6 +1480,7 @@ function closeUpModal(){
 
 // ═══ Edit ═══
 async function openEdit(id){
+  if(pendingReportDeletes.has(id)){showToast('삭제 대기 중인 보고서입니다. 삭제 취소 후 수정하세요.','w');return;}
   const r=await dbGet(id); editId=id; fQueue=[];
   cTags=[...r.tags];
   replaceFileItem=null;
@@ -1098,6 +1492,7 @@ async function openEdit(id){
   document.getElementById('skipBtn').style.display='none';
   document.getElementById('upDateHint').textContent='';
   document.getElementById('upMemo').value=r.memo||'';
+  fillOperationSelect(document.getElementById('upOperation'), r.operation, false);
   // 파일 교체 섹션 표시
   const rfg=document.getElementById('replaceFileFg');
   rfg.style.display='block';
@@ -1113,6 +1508,7 @@ async function updateReport(){
   r.date=fromDisplayDate(document.getElementById('upDate').value);
   r.tags=[...cTags];
   r.memo=document.getElementById('upMemo').value.trim();
+  r.operation=selectedReportOperation();
   // ── 파일 교체 처리 ──
   if(replaceFileItem){
     const {handle,file,buf}=replaceFileItem;
@@ -1127,25 +1523,12 @@ async function updateReport(){
 }
 
 // ═══ File Replace (수정 시 파일 교체) ═══
-async function selectReplaceFile(){
-  if(FSA){
-    try{
-      const [h]=await window.showOpenFilePicker({multiple:false});
-      const f=await h.getFile();
-      replaceFileItem={handle:h,file:f,buf:null};
-      const rn=document.getElementById('replaceFilename');
-      rn.textContent='✅ '+f.name;
-      rn.style.color='var(--success)'; rn.style.fontStyle='normal';
-      showToast('📎 교체 파일 선택됨: '+f.name,'ok');
-    }catch(e){if(e.name!=='AbortError')showToast('오류: '+e.message,'err');}
-  } else {
-    document.getElementById('replaceFileInput').click();
-  }
-}
+function selectReplaceFile(){document.getElementById('replaceFileInput').click();}
 async function onReplaceFileSelected(file){
   if(!file) return;
   const buf=await file.arrayBuffer();
   replaceFileItem={handle:null,file,buf};
+  cTags=withFilenameUnitTags(file.name,cTags);renderChips();
   const rn=document.getElementById('replaceFilename');
   rn.textContent='✅ '+file.name;
   rn.style.color='var(--success)'; rn.style.fontStyle='normal';
@@ -1188,8 +1571,11 @@ function regSelected(){
 let allReports=[];
 async function loadReports(){
   allReports=await dbAll();
+  // Saved tags are authoritative. Infer unit tags only on registration or file replacement.
   allReports.sort((a,b)=>(b.date||b.createdAt.slice(0,10)).localeCompare(a.date||a.createdAt.slice(0,10)));
-  updateStats(); applySearch();
+  await saveReportsToDisk();
+  refreshOperationControls(); updateStats(); applySearch();
+  publishLinkedReportIndex(linkedReportIndex(allReports));
 }
 function updateStats(){
   const n=allReports.length;
@@ -1197,7 +1583,11 @@ function updateStats(){
   document.getElementById('stTotal').textContent=n;
   document.getElementById('stTags').textContent=new Set(allReports.flatMap(r=>(r.tags||[])).map(t=>'#'+normalizeTag(t)).filter(t=>t!=='#')).size;
   document.getElementById('stLatest').textContent=allReports[0]?fmtDate(allReports[0].date):'-';
-  document.getElementById('statsBar').style.display=n>0?'flex':'none';
+  document.getElementById('stLinked').textContent=allReports.filter(r=>r.operation).length;
+  document.getElementById('countAll').textContent=n;
+  for(const [key,id] of [['copy','countCopy'],['link','countLink'],['none','countNone']]) {
+    document.getElementById(id).textContent=allReports.filter(r=>storageStatus(r).cls===key).length;
+  }
   renderTop10();
 }
 function escReg(s){return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
@@ -1221,18 +1611,31 @@ function isTagHit(tag, tagFilters, textTerms){
 }
 function storageStatus(r){
   if(r.fileData) return {cls:'copy', label:'내부 보관'};
-  if(r.fileHandle) return {cls:'link', label:'경로 연결'};
+  if(r.fileHandle||r.filePath) return {cls:'link', label:'경로 연결'};
   return {cls:'none', label:'파일 없음'};
 }
 function renderReports(list, searchCtx={tagFilters:[], textTerms:[]}){
   const grid=document.getElementById('reportsGrid');
   const empty=document.getElementById('emptyState');
-  if(!list.length){grid.innerHTML='';empty.style.display='block';return;}
+  if(!list.length){
+    grid.innerHTML='';empty.style.display='block';
+    const action=document.getElementById('emptyAction');
+    action.style.display=allReports.length?'none':'';
+    action.textContent='＋ 첫 보고서 등록';
+    action.onclick=()=>{if(!panelOpen) togglePanel();document.getElementById('dropZone').focus();};
+    const paragraphs=empty.querySelectorAll('p');
+    paragraphs[0].textContent=allReports.length ? '조회 조건에 맞는 보고서가 없습니다' : '등록된 보고서가 없습니다';
+    paragraphs[1].textContent=document.getElementById('operationFilter').value
+      ? '파일 등록 시 이 기록에 연결하거나, 전체 보고서에서 기존 보고서를 수정하여 연결하세요.'
+      : '파일 등록 버튼으로 보고서를 추가하거나 검색 조건을 확인하세요.';
+    return;
+  }
   empty.style.display='none';
   grid.innerHTML=list.map(r=>{
     const st=storageStatus(r);
     return `
-    <div class="report-card" onclick="openDetail(${r.id})">
+    <div class="report-card" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail(${r.id});}" onclick="openDetail(${r.id})">
+      <button type="button" class="card-delete" aria-label="보고서 삭제" title="이 보고서 삭제" onclick="event.stopPropagation();delReport(${r.id})" onkeydown="event.stopPropagation()"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button>
       <div class="card-top">
         <div class="card-top-left">
           <span class="report-date">${fmtDate(r.date)}</span>
@@ -1243,6 +1646,7 @@ function renderReports(list, searchCtx={tagFilters:[], textTerms:[]}){
         </div>
       </div>
       <div class="report-name" title="${esc(r.filename)}">${highlightText(r.filename, searchCtx.textTerms)}</div>
+      ${r.operation ? `<div class="report-memo" style="color:var(--accent)">🚥 ${esc(operationLabel(r.operation))}</div>` : ''}
       <div class="report-memo">${r.memo?highlightText(r.memo, searchCtx.textTerms):'<span style="color:var(--muted);font-style:italic">메모 없음</span>'}</div>
       <div class="report-tags">${r.tags.map(t=>`<span class="report-tag ${isTagHit(t, searchCtx.tagFilters, searchCtx.textTerms)?'search-hit-tag':''}">${highlightText(t, searchCtx.textTerms)}</span>`).join('')}</div>
     </div>`;
@@ -1250,6 +1654,21 @@ function renderReports(list, searchCtx={tagFilters:[], textTerms:[]}){
 }
 
 // ═══ Search ═══
+let storageFilter='all';
+function setStorageFilter(value){
+  storageFilter=value;
+  document.querySelectorAll('[data-storage]').forEach(btn=>{
+    const active=btn.dataset.storage===value;
+    btn.classList.toggle('active',active); btn.setAttribute('aria-pressed',String(active));
+  });
+  applySearch();
+}
+function setReportView(view){
+  document.getElementById('reportsGrid').classList.toggle('card-view',view==='card');
+  for(const [id,value] of [['listViewBtn','list'],['cardViewBtn','card']]){
+    const btn=document.getElementById(id); btn.classList.toggle('active',view===value); btn.setAttribute('aria-pressed',String(view===value));
+  }
+}
 let dbt;
 // autocomplete handles search input events
 
@@ -1268,7 +1687,9 @@ function applySearch(){
   const tf=toks.filter(t=>t.startsWith('#')), xt=toks.filter(t=>!t.startsWith('#'));
 
   renderActiveFilters(tf,xt);
-  let f=allReports;
+  const operationId=document.getElementById('operationFilter').value;
+  const selectedOperation=activeOperation();
+  let f=allReports.filter(r=>!operationId || (operationId==='unlinked' ? !r.operation : reportOperationMatches(r,selectedOperation)));
 if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
   const normSearch=normalizeTag(searchTag.slice(1)).toLowerCase();
   return (r.tags||[]).some(g=>{
@@ -1282,6 +1703,11 @@ if(tf.length) f=f.filter(r=>tf.every(searchTag=>{
     (r.memo&&r.memo.toLowerCase().includes(t))||
     (r.tags||[]).some(g=>g.toLowerCase().includes(t)||normalizeTag(g)===normT);
   }));
+  if(storageFilter!=='all') f=f.filter(r=>storageStatus(r).cls===storageFilter);
+  const order=document.getElementById('sortOrder').value;
+  const reportDate=r=>r.date||(r.createdAt||'').slice(0,10);
+  f.sort((a,b)=>order==='name' ? a.filename.localeCompare(b.filename,'ko',{numeric:true}) : order==='oldest' ? reportDate(a).localeCompare(reportDate(b)) : reportDate(b).localeCompare(reportDate(a)));
+  document.getElementById('resultCount').textContent=f.length+'건 / 전체 '+allReports.length+'건';
   renderReports(f,{tagFilters:tf,textTerms:xt});
 renderTop10();
 }
@@ -1308,31 +1734,56 @@ function rmFilter(f){
   applySearch();
 }
 
-function clearSearch(){document.getElementById('searchInp').value='';applySearch();}
+function clearSearch(){document.getElementById('searchInp').value='';closeAc();applySearch();}
 
 // ═══ Detail Modal ═══
+let webReconnectReportId=null;
+function reconnectFile(id){
+  if(reportTasksBusy()){showToast('진행 중인 작업이 끝난 뒤 파일을 연결하세요.','w');return;}
+  webReconnectReportId=id;document.getElementById('webReconnectInput').click();
+}
+async function onWebReconnectSelected(file){
+  if(!file||webReconnectReportId===null)return;
+  const id=webReconnectReportId;webReconnectReportId=null;
+  try{
+    const current=await dbGet(id);if(!current)throw new Error('보고서를 찾을 수 없습니다');
+    if(file.name!==current.filename){showToast('같은 이름의 원본을 선택하세요. 파일을 바꾸려면 수정 → 파일 교체를 이용하세요.','w');return;}
+    await dbPut({...current,fileData:file.slice(0,file.size,file.type||getMime(file.name)),fileHandle:null,filePath:'',fileSize:file.size,fileType:file.type||getMime(file.name)});
+    await loadReports();showToast('파일을 브라우저에 보관했습니다.','ok');
+    if(document.getElementById('dtModal').classList.contains('on'))await openDetail(id);
+  }catch(e){showToast('파일 보관 실패: '+e.message,'err');}
+}
+function reconnectButton(id){
+  return `<button class="btn btn-ghost" onclick="connectReportFolder()">📁 원본 폴더에서 파일 가져오기</button> <button class="btn btn-primary" onclick="reconnectFile(${id})">📎 파일 다시 연결</button>`;
+}
 async function openDetail(id){
   const r=await dbGet(id); if(!r) return;
+  releasePreviewURL();
 
   // permission status
   let perm='none';
-  if(r.fileHandle){
+  if(r.fileData){
+    perm='buffer'; // 저장된 사본은 원본 파일의 접근 권한과 무관하게 사용합니다.
+  } else if(r.filePath&&reportDiskReady){
+    perm='granted';
+  } else if(r.fileHandle){
     try{perm=await r.fileHandle.queryPermission({mode:'read'});}
     catch(e){perm='error';}
-  } else if(r.fileData){
-    perm='buffer'; // 드래그 업로드
   }
+  const needsPermission=perm==='prompt'||perm==='denied';
 
   document.getElementById('dtContent').innerHTML=`
     <h2 style="margin-bottom:4px;word-break:break-all">${fileIcon(r.filename)} ${esc(r.filename)}</h2>
+    ${r.operation ? `<p style="color:var(--accent);margin:8px 0">🚥 관련 기동/정지: ${esc(operationLabel(r.operation))}</p>` : ''}
     <p style="font-size:.75rem;color:var(--muted);margin-bottom:16px">
       등록일: ${new Date(r.createdAt).toLocaleDateString('ko-KR')} &nbsp;|&nbsp;
       크기: ${fmtSize(r.fileSize)} &nbsp;|&nbsp;
       ${perm==='granted'||perm==='buffer'
         ?'<span style="color:var(--success)">🔓 파일 접근 가능</span>'
-        :perm==='prompt'
+        :needsPermission
         ?'<span style="color:var(--warn)">🔒 접근 권한 필요</span>'
-        :'<span style="color:var(--muted)">🔗 핸들 없음</span>'}
+        :perm==='error'?'<span style="color:var(--warn)">🔗 파일 연결 확인 필요</span>'
+        :'<span style="color:var(--muted)">📎 저장된 파일 없음</span>'}
     </p>
     <div class="dsec">
       <h3>📅 발생 일자</h3>
@@ -1357,25 +1808,27 @@ async function openDetail(id){
       <div id="prevArea" style="min-height:60px">
         ${perm==='granted'||perm==='buffer'
           ?'<p style="font-size:.82rem;color:var(--muted)">⏳ 미리보기 로딩 중...</p>'
-          :perm==='prompt'
-          ?`<button class="btn btn-warn" onclick="reqAndPreview(${id})">🔑 파일 접근 권한 요청 후 미리보기</button>`
-          :'<p style="color:var(--muted);font-size:.82rem">파일 핸들이 없습니다 — 파일을 다시 등록해 주세요</p>'}
+          :needsPermission
+          ?`<p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">원본 파일을 읽을 권한이 필요합니다. 권한을 허용하거나 원본을 다시 연결하세요.</p><button class="btn btn-warn" onclick="reqAndPreview(${id})">🔑 파일 접근 허용</button> ${reconnectButton(id)}`
+          :`<p style="color:var(--muted);font-size:.82rem;line-height:1.7;margin-bottom:12px">${perm==='error'?'원본 파일 연결을 확인할 수 없습니다.':'보고서 정보는 있지만 파일 데이터와 원본 연결이 없습니다.'}<br>같은 이름의 원본 파일을 선택하면 날짜·태그·메모를 유지한 채 미리보기를 복구합니다.</p>${reconnectButton(id)}`}
       </div>
     </div>`;
 
   document.getElementById('dtFooter').innerHTML=`
     <button class="btn btn-danger" onclick="delReport(${r.id})">🗑️ 삭제</button>
     <button class="btn btn-ghost" onclick="openEdit(${r.id})">✏️ 수정</button>
+    ${r.fileData?`<button class="btn btn-warn" onclick="reconnectFile(${r.id})">📎 파일 다시 연결</button>`:''}
     ${(perm==='granted'||perm==='buffer')
       ?(isPreviewable(r.filename)
         ?`<button class="btn btn-success" onclick="openFileInTab(${r.id})">🔗 새 탭에서 열기</button>`
         :`<button class="btn btn-primary" onclick="downloadFileDirect(${r.id})">⬇️ 파일 다운로드</button>`)
       :''}
-    ${perm==='prompt'
+    ${needsPermission
       ?`<button class="btn btn-warn" onclick="reqAndPreview(${r.id})">🔑 권한 요청</button>`:''}
     <button class="btn btn-primary" onclick="closeDtModal()">닫기</button>`;
 
   document.getElementById('dtModal').classList.add('on');
+  document.getElementById('dtModal').dataset.reportId=String(id);
 
   // 권한 있으면 자동 미리보기
   if(perm==='granted'||perm==='buffer') loadPreview(r);
@@ -1413,25 +1866,9 @@ function getMime(name){
 
 // ─ 파일 Blob 반환 (항상 정확한 MIME 타입 보장) ─
 async function getFileBlob(r){
-  const mime=getMime(r.filename);
-  if(r.fileData){
-    return new Blob([r.fileData],{type:mime});
-  }
-  if(r.fileHandle){
-    const perm=await r.fileHandle.queryPermission({mode:'read'});
-    if(perm!=='granted'){
-      const p2=await r.fileHandle.requestPermission({mode:'read'});
-      if(p2!=='granted') throw new Error('권한 거부');
-    }
-    const f=await r.fileHandle.getFile();
-    // MIME 타입이 잘못된 경우 확장자 기반으로 재지정
-    return (f.type && f.type!=='application/octet-stream')
-      ? f
-      : new Blob([await f.arrayBuffer()],{type:mime});
-  }
-  throw new Error('파일 없음');
+  if(r.fileData)return new Blob([r.fileData],{type:r.fileType||getMime(r.filename)});
+  throw new Error('보관된 파일이 없습니다. 파일 다시 연결 또는 원본 폴더에서 가져오기를 실행하세요.');
 }
-
 // ─ XLSX 렌더링 (SheetJS) ─
 let xlsxWorkbook=null;
 async function renderXLSX(blob, area, rid){
@@ -1505,10 +1942,22 @@ async function renderDOCX(blob, area, rid){
 
 // ─ 해시태그 Top 10 ─
 let top10Open=true;
+let top10Limit='10';
+try{const saved=localStorage.getItem('reportTagDisplayLimit');if(['all','10','20','30'].includes(saved))top10Limit=saved;}catch(e){}
+document.getElementById('top10Limit').value=top10Limit;
+function setTop10Limit(value){
+  if(!['all','10','20','30'].includes(value))return;
+  top10Limit=value;
+  try{localStorage.setItem('reportTagDisplayLimit',value);}catch(e){}
+  renderTop10();
+}
 function toggleTop10(){
   top10Open=!top10Open;
   document.getElementById('top10Body').style.display=top10Open?'grid':'none';
-  document.getElementById('top10Arrow').textContent=top10Open?'▲':'▼';
+  const button=document.getElementById('top10Toggle');
+  button.textContent=top10Open?'최소화 ▲':'펼치기 ▼';
+  button.setAttribute('aria-expanded',String(top10Open));
+  document.querySelector('.top10-header').style.marginBottom=top10Open?'12px':'0';
 }
 
 function renderTop10(){
@@ -1526,8 +1975,9 @@ function renderTop10(){
   const wrap=document.getElementById('top10Wrap');
   const body=document.getElementById('top10Body');
 
-  if(!sorted.length){wrap.style.display='none';return;}
   wrap.style.display='block';
+  document.getElementById('top10Summary').textContent=(top10Limit==='all'?'전체':'TOP '+top10Limit)+' · 총 '+sorted.length+'개';
+  if(!sorted.length){body.innerHTML='<p class="top10-empty">등록된 태그가 없습니다.</p>';return;}
 
 const maxCnt=sorted[0][1];
 const rankClass=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
@@ -1538,11 +1988,11 @@ const activeTags=new Set();
 const _re=/#[^#]+/g; let _m;
 while((_m=_re.exec(_searchVal))!==null) activeTags.add(_m[0].trim());
 
-body.innerHTML=sorted.map(([key,cnt],i)=>{
+body.innerHTML=(top10Limit==='all'?sorted:sorted.slice(0,Number(top10Limit))).map(([key,cnt],i)=>{
   const tag=display[key]||key;
   const isActive = activeTags.has(tag.toLowerCase());
   return `
-  <div class="top10-item ${isActive ? 'active' : ''}" onclick="filterByTag('${esc(tag)}')">
+  <button type="button" class="top10-item ${isActive ? 'active' : ''}" data-tag="${esc(tag)}" aria-pressed="${isActive}" onclick="filterByTag(this.dataset.tag)">
 
 
       <span class="top10-rank ${rankClass(i)}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
@@ -1555,7 +2005,7 @@ body.innerHTML=sorted.map(([key,cnt],i)=>{
           <div class="top10-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%"></div>
         </div>
       </div>
-    </div>`;
+    </button>`;
   }).join('');
 }
 
@@ -1585,11 +2035,19 @@ function filterByTag(tag) {
 
 
 // ─ PDF.js 렌더링 ─
+function releasePreviewURL(){
+  const area=document.getElementById('prevArea');
+  if(area?._previewURL){URL.revokeObjectURL(area._previewURL);area._previewURL=null;}
+}
+function renderNativePDF(blob,area,rid){
+  if(!area.isConnected) return;
+  if(area._previewURL) URL.revokeObjectURL(area._previewURL);
+  area._previewURL=URL.createObjectURL(blob);
+  area.innerHTML=`<p style="font-size:.78rem;color:var(--muted);margin-bottom:10px">브라우저 PDF 뷰어로 표시합니다. 화면이 비어 있으면 새 탭에서 열어 주세요.</p><iframe class="preview-frame" title="PDF 파일 미리보기" src="${area._previewURL}"></iframe><button class="btn btn-success btn-sm" onclick="openFileInTab(${rid})">🔗 새 탭에서 열기</button>`;
+}
 async function renderPDF(blob, area, rid){
   if(typeof pdfjsLib==='undefined'){
-    area.innerHTML=`<div class="no-preview">
-      <p style="margin-bottom:10px">PDF.js 로드 실패 (인터넷 연결 확인)</p>
-      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 새 탭에서 열기</button></div>`;
+    renderNativePDF(blob,area,rid);
     return;
   }
   pdfjsLib.GlobalWorkerOptions.workerSrc=
@@ -1610,7 +2068,7 @@ async function renderPDF(blob, area, rid){
         </p>
       </div>`;
 
-    const wrap=document.getElementById('pdfWrap');
+    const wrap=area.querySelector('#pdfWrap');
     for(let i=1;i<=maxP;i++){
       const page=await pdf.getPage(i);
       const vp=page.getViewport({scale:1.6});
@@ -1622,9 +2080,7 @@ async function renderPDF(blob, area, rid){
       wrap.appendChild(canvas);
     }
   }catch(e){
-    area.innerHTML=`<div class="no-preview">
-      <p style="color:var(--danger);margin-bottom:10px">⚠️ PDF 렌더링 실패: ${e.message}</p>
-      <button class="btn btn-success" onclick="openFileInTab(${rid})">🔗 새 탭에서 열기</button></div>`;
+    renderNativePDF(blob,area,rid);
   }
 }
 
@@ -1634,9 +2090,11 @@ async function loadPreview(r){
   const ext=r.filename.split('.').pop().toLowerCase();
   try{
     const blob=await getFileBlob(r);
-    const url=URL.createObjectURL(blob);
+    if(!area.isConnected) return;
 
     if(['jpg','jpeg','png','gif','webp','bmp'].includes(ext)){
+      const url=URL.createObjectURL(blob);
+      area._previewURL=url;
       area.innerHTML=`<img src="${url}" class="preview-img" alt="${esc(r.filename)}">`;
 
     } else if(ext==='pdf'){
@@ -1662,8 +2120,9 @@ async function loadPreview(r){
     }
   }catch(e){
     area.innerHTML=`<div class="no-preview">
-      <p style="color:var(--danger);margin-bottom:10px">⚠️ 미리보기 실패: ${e.message}</p>
-      <button class="btn btn-warn" onclick="reqAndPreview(${r.id})">🔑 권한 재요청</button>
+      <p style="color:var(--danger);margin-bottom:10px">⚠️ 미리보기 실패: ${esc(e.message)}</p>
+      ${r.fileHandle?`<button class="btn btn-warn" onclick="reqAndPreview(${r.id})">🔑 권한 재요청</button>`:''}
+      ${reconnectButton(r.id)}
     </div>`;
   }
 }
@@ -1764,7 +2223,9 @@ async function downloadFileDirect(id){
 
 async function reqAndPreview(id){
   const r=await dbGet(id);
-  if(!r.fileHandle){showToast('파일 핸들이 없습니다','err');return;}
+  if(!r) return;
+  if(r.fileData){await openDetail(id);return;}
+  if(!r.fileHandle){reconnectFile(id);return;}
   try{
     const p=await r.fileHandle.requestPermission({mode:'read'});
     if(p==='granted'){showToast('✅ 접근 허용됐습니다','ok'); openDetail(id);}
@@ -1772,24 +2233,71 @@ async function reqAndPreview(id){
   }catch(e){showToast('오류: '+e.message,'err');}
 }
 
-function closeDtModal(){document.getElementById('dtModal').classList.remove('on');}
+function closeDtModal(){releasePreviewURL();document.getElementById('dtModal').classList.remove('on');}
 
+const pendingReportDeletes=new Map();
+let reportDeleteCommitting=false;
+function renderDeleteGrace(){
+  const panel=document.getElementById('deleteGrace');
+  panel.hidden=!pendingReportDeletes.size;
+  panel.replaceChildren();
+  for(const entry of pendingReportDeletes.values()){
+    const row=document.createElement('div');row.className='delete-grace-row';
+    row.innerHTML=`<div class="delete-grace-message"><span class="delete-grace-name">${esc(entry.filename)}</span><span class="delete-grace-count" id="deleteCountdown-${entry.id}"></span></div>`;
+    const undo=document.createElement('button');undo.type='button';undo.className='btn btn-primary btn-sm';undo.textContent='삭제 취소';undo.disabled=entry.committing;
+    undo.onclick=()=>cancelPendingReportDelete(entry.id);row.appendChild(undo);panel.appendChild(row);
+    updateDeleteCountdown(entry);
+  }
+}
+function updateDeleteCountdown(entry){
+  const label=document.getElementById('deleteCountdown-'+entry.id);
+  if(label)label.textContent=entry.committing?'삭제 처리 중…':Math.max(0,Math.ceil((entry.deadline-Date.now())/1000))+'초 뒤 삭제';
+}
+function cancelPendingReportDelete(id){
+  const entry=pendingReportDeletes.get(id);
+  if(!entry||entry.committing)return;
+  clearInterval(entry.timer);pendingReportDeletes.delete(id);renderDeleteGrace();showToast('삭제를 취소했습니다. 보고서는 그대로 유지됩니다.','ok');
+}
+function scheduleReportDelete(record){
+  if(pendingReportDeletes.has(record.id))return;
+  const entry={id:record.id,filename:record.filename,deadline:Date.now()+10000,committing:false,timer:null};
+  pendingReportDeletes.set(record.id,entry);renderDeleteGrace();
+  entry.timer=setInterval(()=>{
+    updateDeleteCountdown(entry);
+    if(Date.now()>=entry.deadline&&!entry.committing&&!reportTasksBusy(false))commitPendingReportDelete(entry);
+  },200);
+}
+async function commitPendingReportDelete(entry){
+  if(pendingReportDeletes.get(entry.id)!==entry||entry.committing)return;
+  entry.committing=true;reportDeleteCommitting=true;clearInterval(entry.timer);renderDeleteGrace();
+  try{
+    await dbDel(entry.id);
+    const modal=document.getElementById('dtModal');if(modal.dataset.reportId===String(entry.id))closeDtModal();
+    await loadReports();showToast('🗑️ 보고서가 삭제됐습니다','ok');
+  }catch(e){showToast('삭제 실패: '+e.message,'err');}
+  finally{pendingReportDeletes.delete(entry.id);reportDeleteCommitting=false;renderDeleteGrace();}
+}
 async function delReport(id){
+  if(reportTasksBusy(false)){showToast('진행 중인 작업이 끝난 뒤 삭제하세요.','w');return;}
+  if(pendingReportDeletes.has(id)){showToast('삭제 대기 중입니다. 아래의 삭제 취소 버튼으로 취소할 수 있습니다.','w');return;}
   const r = await dbGet(id);
+  if(!r){await loadReports();showToast('이미 삭제된 보고서입니다.','w');return;}
   const fname = r ? r.filename : '';
   const dateStr = r && r.date ? fmtDate(r.date) : '날짜 미지정';
   showConfirm({
     icon: '🗑️',
     title: '보고서를 삭제할까요?',
-    msg: `<strong>${fname}</strong>
+    msg: `<strong>${esc(fname)}</strong>
           <br><span style="color:var(--accent)">${dateStr}</span>
-          <br>보고서 정보가 삭제됩니다.
+          <br>이 보고서의 정보·저장된 사본·연결 정보가 삭제됩니다.
+          <br>확인 후 10초 동안 삭제 취소가 가능합니다.
           <br>파일 원본은 삭제되지 않습니다.`,
-    okLabel: '예, 삭제',
+    okLabel: '예, 10초 뒤 삭제',
     okClass: 'btn-danger',
     onOk: async () => {
-      await dbDel(id); closeDtModal(); await loadReports();
-      showToast('🗑️ 삭제됐습니다', 'ok');
+      if(reportTasksBusy(false)){showToast('진행 중인 작업이 끝난 뒤 삭제하세요.','w');return;}
+      scheduleReportDelete(r);
+      const modal=document.getElementById('dtModal');if(modal.dataset.reportId===String(id))closeDtModal();
     }
   });
 }
@@ -1816,7 +2324,7 @@ function showBackupStatus(message,missing=[]){
     status=document.createElement('div');status.id='backupStatus';
     status.style.cssText='font-size:.75rem;line-height:1.7;margin-top:12px;overflow-wrap:anywhere';
     status.setAttribute('role','status');
-    document.querySelector('.container').prepend(status);
+    document.querySelector('.data-panel').appendChild(status);
   }
   status.textContent=message;
   if(missing.length){
@@ -1847,7 +2355,7 @@ async function buildPortableBackup(reports,onProgress=()=>{}){
     let blob=null,reason='';
     try{blob=await getFileBlob(r);}
     catch(e){
-      reason=!r.fileData&&!r.fileHandle?'저장된 파일과 원본 연결 없음'
+      reason=!r.fileData&&!r.fileHandle&&!r.filePath?'저장된 파일과 원본 연결 없음'
         :e.name==='NotFoundError'?'원본 파일이 이동되거나 삭제됨'
         :e.name==='NotAllowedError'||e.name==='SecurityError'||e.message==='권한 거부'?'원본 접근 권한 없음 — 파일 재연결 후 다시 백업하세요'
         :'파일 읽기 실패: '+(e.message||String(e));
@@ -1871,7 +2379,7 @@ async function buildPortableBackup(reports,onProgress=()=>{}){
   return {blob:new Blob(parts,{type:'application/octet-stream'}),reports:total,filesIncluded:included,filesMissing:missing};
 }
 async function exportWithFiles(){
-  if(backupInProgress||restoreInProgress){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
+  if(reportTasksBusy()){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
   backupInProgress=true;
   const buttons=[...document.querySelectorAll('button[onclick="exportWithFiles()"]')];
   buttons.forEach(b=>b.disabled=true);
@@ -1907,6 +2415,7 @@ async function* backupLines(file){
   pending+=decoder.decode();if(pending.trim())yield pending;
 }
 async function restorePortableBackup(file,onProgress=()=>{}){
+  const restoreIndex=await buildRestoreIndex();
   let header=false,footer=false,current=null,count=0,withFile=0;
   const missing=[];
   try{
@@ -1928,7 +2437,7 @@ async function restorePortableBackup(file,onProgress=()=>{}){
       }else if(item.type==='end'){
         if(!current||item.chunks!==current.parts.length||current.hasFile&&current.size!==current.metadata.fileSize)throw new Error('파일 내용이 누락되거나 손상됐습니다');
         const r=current.metadata;
-        await dbAdd({fileHandle:null,fileData:current.hasFile?new Blob(current.parts,{type:r.fileType||getMime(r.filename)}):null,filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:Array.isArray(r.tags)?r.tags:[],memo:r.memo||'',operation:typeof validOperation==='function'?validOperation(r.operation):r.operation||null,createdAt:r.createdAt||new Date().toISOString()});
+        await saveRestoredReport({fileHandle:null,fileData:current.hasFile?new Blob(current.parts,{type:r.fileType||getMime(r.filename)}):null,filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:Array.isArray(r.tags)?r.tags:[],memo:r.memo||'',operation:typeof validOperation==='function'?validOperation(r.operation):r.operation||null,createdAt:r.createdAt||new Date().toISOString()},restoreIndex,r.createdAt);
         count++;if(current.hasFile)withFile++;else missing.push({filename:r.filename,reason:current.reason||'백업에 파일 내용 없음 — 원본 재연결 필요'});
         current=null;onProgress(count);
       }else if(item.type==='footer'){
@@ -1945,7 +2454,7 @@ async function restorePortableBackup(file,onProgress=()=>{}){
 let restoreInProgress=false;
 async function importData(file){
   if(!file)return;
-  if(backupInProgress||restoreInProgress){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
+  if(reportTasksBusy()){showToast('진행 중인 백업 또는 복원이 끝난 뒤 다시 시도하세요.','w');return;}
   restoreInProgress=true;
   try{
     const prefix=await file.slice(0,4096).text();
@@ -1963,20 +2472,20 @@ async function importData(file){
 
 // Lightweight backups carry a lookup reference, never a transferable permission token.
 async function exportData(){
-  if(backupInProgress||restoreInProgress){showToast('진행 중인 작업이 끝난 뒤 다시 시도하세요.','w');return;}
+  if(reportTasksBusy()){showToast('진행 중인 작업이 끝난 뒤 다시 시도하세요.','w');return;}
   backupInProgress=true;
   try{
-    showBackupStatus('경로 연결 백업 준비 중…');
+    showBackupStatus('보고서 정보 백업 준비 중…');
     const reports=[];
     for await(const r of storedBackupReports()){
-      reports.push({filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:r.tags||[],memo:r.memo||'',operation:r.operation||null,createdAt:r.createdAt||'',fileRef:{database:DB,store:ST,id:r.id,filename:r.filename,fileSize:r.fileSize||0,createdAt:r.createdAt||''}});
+      reports.push({filename:r.filename,fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:r.tags||[],memo:r.memo||'',operation:r.operation||null,createdAt:r.createdAt||'',relativePath:r.relativePath||'',fileRef:{database:DB,store:ST,id:r.id,filename:r.filename,fileSize:r.fileSize||0,createdAt:r.createdAt||''}});
     }
     const blob=new Blob([JSON.stringify({version:4,backupType:'local-file-references',exportedAt:new Date().toISOString(),reports})],{type:'application/json'});
     const url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download=`troubleshoot_path_backup_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.json`;
     a.style.display='none';document.body.appendChild(a);a.click();
     setTimeout(()=>{a.remove();URL.revokeObjectURL(url);},60000);
-    showBackupStatus(`경로 연결 백업 ${reports.length}건 · ${fmtSize(blob.size)}. PDF 내용은 포함하지 않습니다. 같은 브라우저 저장소에 원본 연결이 남아 있으면 복원 시 자동으로 이어집니다.`);
+    showBackupStatus(`보고서 정보 백업 ${reports.length}건 · ${fmtSize(blob.size)}. PDF 내용은 포함하지 않습니다. 같은 브라우저 저장소에 원본 연결이 남아 있으면 복원 시 자동으로 이어집니다.`);
     showToast(`✅ 가벼운 백업 ${reports.length}건 (${fmtSize(blob.size)})`,'ok');
   }catch(e){showBackupStatus('백업 실패: '+e.message);showToast('백업 실패: '+e.message,'err');}
   finally{backupInProgress=false;}
@@ -1985,9 +2494,10 @@ function matchesBackupRecord(local,r){
   return local.filename===r.filename && (!r.fileSize||local.fileSize===r.fileSize) && (!r.createdAt||local.createdAt===r.createdAt);
 }
 async function restoreReferenceBackup(reports){
+  const restoreIndex=await buildRestoreIndex();
   // Build the lookup before adding records, so this import cannot match itself.
   const candidates=[];
-  for await(const r of storedBackupReports())if(r.fileHandle||r.fileData)candidates.push({id:r.id,filename:r.filename,fileSize:r.fileSize,createdAt:r.createdAt});
+  for await(const r of storedBackupReports())if(r.fileHandle||r.fileData)candidates.push({id:r.id,filename:r.filename,fileSize:r.fileSize,date:r.date,createdAt:r.createdAt,score:(r.fileData?2:0)+(r.fileHandle?1:0)});
   let count=0,connected=0,withFile=0;
   const missing=[];
   for(const r of reports){
@@ -1998,9 +2508,9 @@ async function restoreReferenceBackup(reports){
       if(item&&matchesBackupRecord(item,r)&&(item.fileHandle||item.fileData))local=item;
     }
     if(!local){
-      const matches=candidates.filter(item=>matchesBackupRecord(item,r));
-      // Multiple duplicates are safe only if one carries the original backup's identity.
-      if(matches.length===1)local=await dbGet(matches[0].id);
+      const matches=candidates.filter(item=>matchesBackupRecord(item,r)&&(r.createdAt||!r.date||item.date===r.date));
+      matches.sort((a,b)=>b.score-a.score||a.id-b.id);
+      if(matches.length)local=await dbGet(matches[0].id);
     }
     let fileData=null,fileHandle=local?.fileHandle||null;
     if(typeof r.fileDataB64==='string'){
@@ -2009,8 +2519,8 @@ async function restoreReferenceBackup(reports){
       fileData=bytes.buffer;withFile++;
     }else if(local?.fileData){fileData=local.fileData;connected++;}
     else if(fileHandle)connected++;
-    else missing.push({filename:r.filename||'알수없음',reason:'이 브라우저 저장소에 기존 원본 연결이 없습니다. 원본 파일을 다시 연결해 주세요.'});
-    await dbAdd({fileHandle,fileData,filename:r.filename||'알수없음',fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:Array.isArray(r.tags)?r.tags:[],memo:r.memo||'',operation:typeof validOperation==='function'?validOperation(r.operation):r.operation||null,createdAt:r.createdAt||new Date().toISOString()});
+    else missing.push({filename:r.filename||'알수없음',reason:'파일이 없는 백업입니다. 원본 폴더에서 파일 가져오기를 실행하세요.'});
+    await saveRestoredReport({fileHandle,fileData,filePath:r.filePath||local?.filePath||'',relativePath:r.relativePath||local?.relativePath||'',rootFolderName:r.rootFolderName||local?.rootFolderName||'',filename:r.filename||'알수없음',fileSize:r.fileSize||0,fileType:r.fileType||'',date:r.date||'',tags:Array.isArray(r.tags)?r.tags:[],memo:r.memo||'',operation:typeof validOperation==='function'?validOperation(r.operation):r.operation||null,createdAt:r.createdAt||new Date().toISOString()},restoreIndex,r.createdAt);
     count++;showBackupStatus(`보고서 ${count} / ${reports.length}건 복원 중…`);
   }
   return {count,connected,withFile,missing};
@@ -2020,9 +2530,83 @@ async function importLegacyData(file){
   if(!Array.isArray(reports))throw new Error('올바른 백업 파일이 아닙니다');
   const result=await restoreReferenceBackup(reports);
   await loadReports();
-  const message=`복원 ${result.count}건 · 기존 파일 자동 연결 ${result.connected}건 · 파일 내용 복원 ${result.withFile}건 · 재연결 필요 ${result.missing.length}건`;
+  const message=`복원 처리 ${result.count}건 · 기존 파일 자동 연결 ${result.connected}건 · 파일 내용 복원 ${result.withFile}건 · 재연결 필요 ${result.missing.length}건`;
   showBackupStatus(message+(result.connected?' 접근 권한이 만료된 원본은 보고서를 열 때 허용해 주세요.':''),result.missing);
   showToast('✅ '+message,result.missing.length?'w':'ok');
+}
+
+
+let folderConnectionInProgress=false;
+function connectReportFolder(){
+  if(reportTasksBusy()){showToast('진행 중인 작업이 끝난 뒤 폴더를 선택하세요.','w');return;}
+  document.getElementById('webFolderInput').dataset.mode='connect';document.getElementById('webFolderInput').click();
+}
+async function connectWebFolderFiles(files){
+  folderConnectionInProgress=true;
+  let connected=0;const missing=[];
+  try{
+    const byName=new Map();for(const file of files){if(!byName.has(file.name))byName.set(file.name,[]);byName.get(file.name).push(file);}
+    for(const report of await dbAll()){
+      if(report.fileData)continue;
+      let candidates=(byName.get(report.filename)||[]).filter(file=>!report.fileSize||file.size===report.fileSize);
+      if(report.relativePath){const exact=candidates.filter(file=>file.webkitRelativePath===report.relativePath||file.webkitRelativePath.endsWith('/'+report.relativePath));if(exact.length)candidates=exact;}
+      if(candidates.length!==1){missing.push({filename:report.filename,reason:candidates.length>1?'같은 이름의 파일이 여러 개입니다. 개별 파일 다시 연결을 사용하세요.':'이름·크기가 일치하는 파일을 찾지 못했습니다.'});continue;}
+      const file=candidates[0];await dbPut({...report,fileData:file.slice(0,file.size,file.type||getMime(file.name)),fileHandle:null,filePath:'',fileSize:file.size,fileType:file.type||getMime(file.name)});connected++;
+    }
+    await loadReports();const message='브라우저 파일 보관 '+connected+'건 · 미연결 '+missing.length+'건';showBackupStatus(message,missing);showToast(message,missing.length?'w':'ok');
+    const modal=document.getElementById('dtModal');if(modal.classList.contains('on'))await openDetail(Number(modal.dataset.reportId));
+  }catch(e){await loadReports();showToast('폴더 가져오기 실패: '+e.message,'err');}
+  finally{folderConnectionInProgress=false;}
+}
+let formatInProgress=false;
+function reportTasksBusy(includePendingDeletes=true){return backupInProgress||restoreInProgress||formatInProgress||folderConnectionInProgress||reportDeleteCommitting||(includePendingDeletes&&pendingReportDeletes.size>0);}
+async function buildRestoreIndex(){
+  const index=[];
+  for await(const r of storedBackupReports())index.push({id:r.id,filename:r.filename,fileSize:r.fileSize||0,date:r.date||'',createdAt:r.createdAt||'',score:(r.fileData?2:0)+(r.fileHandle?1:0)});
+  return index;
+}
+async function saveRestoredReport(record,index,sourceCreatedAt){
+  record.fileHandle=null;record.filePath='';
+  const matches=index.filter(item=>item.filename===record.filename && item.fileSize===record.fileSize && (sourceCreatedAt?item.createdAt===sourceCreatedAt:item.date===record.date));
+  matches.sort((a,b)=>b.score-a.score||a.id-b.id);
+  let existing=matches.length?await dbGet(matches[0].id):null;
+  if(existing){
+    // A metadata-only backup must not erase an existing file or permission handle.
+    if(!record.fileData)record.fileData=existing.fileData||null;
+    if(!record.fileHandle)record.fileHandle=existing.fileHandle||null;
+    record.id=existing.id;
+    if(!sourceCreatedAt)record.createdAt=existing.createdAt||record.createdAt;
+    await dbPut(record);
+  }else record.id=await dbAdd(record);
+  const entry={id:record.id,filename:record.filename,fileSize:record.fileSize,date:record.date,createdAt:record.createdAt,score:(record.fileData?2:0)+(record.fileHandle?1:0)};
+  const i=index.findIndex(item=>item.id===record.id);if(i>=0)index[i]=entry;else index.push(entry);
+  return existing?'updated':'added';
+}
+function requestFormatReports(){
+  if(reportTasksBusy()){showToast('진행 중인 백업 또는 복원이 끝난 뒤 포맷하세요.','w');return;}
+  showConfirm({icon:'⚠️',title:'보고서 데이터를 전체 포맷할까요?',
+    msg:`등록된 보고서 <strong>${allReports.length}건</strong>의 날짜·태그·메모, 내부 저장 파일과 원본 연결을 모두 삭제합니다.<br><br>PC의 원본 PDF와 다운로드한 백업 파일은 삭제하지 않습니다.<br><br><strong>경로만 백업한 경우, 포맷 후에는 원본 연결도 사라져 파일을 다시 연결해야 합니다.</strong><br>이 웹 주소의 브라우저 저장소에 적용됩니다.`,
+    okLabel:'확인, 전체 포맷',okClass:'btn-danger',onOk:formatReports});
+}
+async function formatReports(){
+  if(reportTasksBusy()){showToast('진행 중인 작업이 끝난 뒤 다시 시도하세요.','w');return;}
+  formatInProgress=true;
+  const button=document.getElementById('formatReportsBtn');if(button)button.disabled=true;
+  try{
+    await dbo('readwrite',store=>store.clear());
+    markReportDiskPending();
+    if(typeof closeDtModal==='function')closeDtModal();
+    closeUpModal();closeFolderModal();closeDupModal();closeGuideModal();
+    document.getElementById('searchInp').value='';
+    const operation=document.getElementById('operationFilter');if(operation)operation.value='';
+    const sort=document.getElementById('sortOrder');if(sort)sort.value='newest';
+    if(typeof closeAc==='function')closeAc();
+    if(typeof setStorageFilter==='function')setStorageFilter('all');
+    const status=document.getElementById('backupStatus');if(status)status.textContent='';
+    await loadReports();
+    showToast('✅ 보고서 데이터 전체 포맷 완료','ok');
+  }catch(e){showToast('포맷 실패: '+e.message,'err');}
+  finally{formatInProgress=false;if(button)button.disabled=false;}
 }
 
 
@@ -2409,7 +2993,19 @@ function showConfirm({ icon='⚠️', title='확인', msg='', okLabel='예, 삭�
 }
 
 
-initDB().then(loadReports);
+initDB().then(()=>reportIndexBridge ? refreshLinkedReportIndex() : loadReports()).then(async()=>{
+  if(reportIndexBridge) return;
+  reportContextReady=true;
+  const directContext=reportContextFromURL();
+  if(directContext) await applyWorkHubReportContext(directContext);
+  if(pendingReportContext){const context=pendingReportContext;pendingReportContext=null;await applyWorkHubReportContext(context);}
+  if(window.parent!==window){
+    const fileButton=document.querySelector('button[onclick="selectFiles()"]');
+    if(fileButton) fileButton.textContent='📄 파일 선택 (내부 보관)';
+    window.parent.postMessage({type:'workhub-report-ready'},location.origin==='null'?'*':location.origin);
+  }
+}).catch(e=>showToast('보고서 저장소를 열지 못했습니다: '+e.message,'err'));
 </script>
 </body>
 </html>
+
